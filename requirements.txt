@@ -58,7 +58,7 @@ semver==2.13.0
 six==1.16.0
 smmap==5.0.0
 statsmodels==0.13.2
-streamlit==1.14.0
+streamlit==1.15.0
 tenacity==8.1.0
 threadpoolctl==3.1.0
 toml==0.10.2
