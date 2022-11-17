@@ -15,7 +15,7 @@ def main():
     """
 
     #set the logo
-    st.sidebar.image("./Images/Logo_iPSC.png", output_format = "png", width = 300)
+    st.sidebar.image("./Images/Logo_iPSC.png", output_format = "png", width = 200)
     start_page()
 
 

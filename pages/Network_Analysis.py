@@ -266,8 +266,8 @@ def chart_plot(node, index, mirna = None, checkbox = True):
                                             edge_color=dim("trial").str(),
                                             node_color=dim('supercluster_gene').str(),
                                             edge_line_width = 1,
-                                            width = 650, 
-                                            height = 650, 
+                                            width = 500, 
+                                            height = 500, 
                                             node_size = dim("score")/400, 
                                             fontsize = {"labels":0.5},
                                             node_line_width = 1, 
@@ -281,8 +281,8 @@ def chart_plot(node, index, mirna = None, checkbox = True):
                                             edge_color=dim("trial").str(),
                                             node_color=dim('supercluster_gene').str(),
                                             edge_line_width = 1,
-                                            width = 650, 
-                                            height = 650, 
+                                            width = 500, 
+                                            height = 500, 
                                             fontsize = {"labels":0.5},
                                             node_line_width = 1
                                             ))
