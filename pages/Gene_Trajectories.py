@@ -129,7 +129,6 @@ def make_trajectories(df_curves, tpm_curves = None, tab = None):
     if tpm_curves is not None:
         #draw lineplots for the data with standard errors
             #vsd_fig = px.box(df_curves,x = "variable", y = "value", color = "Unnamed: 0")
-        print(tpm_curves, df_curves)
         vsd_figure = draw_altair_graph(df_curves, "z-scored variance stabilized counts", "Gene Name")
         tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
         # write the figure into the ap

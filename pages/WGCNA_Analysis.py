@@ -220,7 +220,7 @@ def draw_interactive_network(gene_network):
     Returns:
         interactive_figure -> plotly figure 
     """
-    module = "purple"
+    module = "skyblue"
     degree = gene_network.degree()
     values = [t for i, t in degree]
     pos = nx.spring_layout(gene_network)
