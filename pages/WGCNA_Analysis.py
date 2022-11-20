@@ -267,8 +267,7 @@ def draw_interactive_network(gene_network):
         mode='markers+text',
         marker=dict(
             color=module,
-            size=30,
-            linewidth = 1
+            size=30
            ))
 
 
