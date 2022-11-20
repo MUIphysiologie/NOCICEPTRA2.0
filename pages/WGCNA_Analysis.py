@@ -268,6 +268,7 @@ def draw_interactive_network(gene_network):
         marker=dict(
             color=module,
             size=30,
+            linewidth = 1
            ))
 
 
