@@ -6,63 +6,30 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import plotly.graph_objects as go
 import altair as alt
+import duckdb 
 
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_data(data_path):
-    """ load the data for the exploratory data analysis 
-    input:
-        data_path <- str: the relative path where the data is located
-    returns:
-    dataframe_dictionary <- dict: dictionary of dataframes loaded from parquet
     """
-    columns_to_skip = ["Unnamed: 0"]
-    dataframe_dictionary = {}
-    sup_mrna = pd.read_parquet(data_path + "Supercluster_iPSC_network_mRNA_all_zelllines.parquet")
-    sup_mirna = pd.read_parquet(data_path + "miR_superclustering.parquet")
-    chord_diagram = pd.read_parquet(data_path + "mirna_edges.parquet")
-    mirna_enr = pd.read_parquet(data_path + "mirna_enrich.parquet")
-    gprofiler_enr = pd.read_parquet(data_path + "gene_enrich.parquet")
-    dataframe_dictionary.update({"supercluster_mrna":sup_mrna, "sup_mirna": sup_mirna, "chord_diagram": chord_diagram, "mirna_enr": mirna_enr, "gprofiler_enr": gprofiler_enr})
-    return dataframe_dictionary
+    should load the parquet files to retrieve the tables
+    """
+    try:
+        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
+        return con
+    except:
+        print("Error")
 
-def exploratory_data_analysis(data_dict):
+def exploratory_data_analysis(con):
     """ start the analysis 
     args:
         data_dict: dict -> dictionary with all dataframe
     """
-    experimental_description(data_dict["supercluster_mrna"], data_dict["sup_mirna"], data_dict["chord_diagram"], data_dict["gprofiler_enr"], data_dict["mirna_enr"])
+    experimental_description(con)
 
-def get_clusters(sup_mrna):
-    """ get the clusters from the table of mRNAs
-    
-    Args:
-        sup_mrna: pd.DataFrame -> expression matrix of mRNAs
-    returns:
-        supercluster: pd.DataFrame -> matrix with correctly assigned clusters"""
-    supercluster = sup_mrna.copy(deep = True)
-    cluster_name = {5: 1, 6: 2, 2: 3, 1: 4, 4: 5, 3: 6}
-
-    cluster_end = {
-        1: "pluripotency/maturation",
-        2: "pluripotency",
-        3: "early differentiation",
-        4: "early neural progenitor",
-        5: "neural progenitor_late",
-        6: "nociceptor"
-    }
-
-    supercluster["hierachical_cluster"] = [
-        cluster_name.get(i) for i in supercluster["hierachical_cluster"]
-    ]
-    supercluster["hierachical_cluster"] = [
-        cluster_end.get(i) for i in supercluster["hierachical_cluster"]
-    ]
-
-    return supercluster    
-
-def experimental_description(sup_mrna, sup_mirna, mirna_edges, gene_enr, mirna_enr):
+  
+def experimental_description(con):
     """  initialize the analysis and draw networks for mirnas, mRNAs and trajectories of modules
     
     Args:
@@ -76,8 +43,6 @@ def experimental_description(sup_mrna, sup_mirna, mirna_edges, gene_enr, mirna_e
     tab1, tab2 = st.tabs(["WGCNA mRNA expression","WGCNA miRNA expression"])
     # retrieve the cluster groups
 
-    sup_mrna = get_clusters(sup_mrna)
-    
 
     #set the columns
     columns = ["D0_S1","D0_S2","D0_S3",
@@ -98,31 +63,25 @@ def experimental_description(sup_mrna, sup_mirna, mirna_edges, gene_enr, mirna_e
 
     #mRNA trajectories
     col1, col2 = tab1.columns(2)
-    stages = list(set(sup_mrna["hierachical_cluster"]))
+    stages = con.execute("Select hierachical_cluster from sup_mrna").fetchdf()["hierachical_cluster"].unique()
+    
     sel_stage = col1.selectbox("Please choose the differentiation stage:", stages)
 
     # retrieve the right stage
-    sup_mrna_stage = sup_mrna[sup_mrna["hierachical_cluster"] == sel_stage]
-
+    modules = con.execute(f"Select cluster from sup_mrna WHERE hierachical_cluster='{sel_stage}'").fetchdf()["cluster"].unique()
     # list the module stages for the frontend 
-    modules = list(set(sup_mrna_stage["cluster"]))
     module_sel = col2.selectbox("Choose WGCNA module: ", modules)
-    col1.write("---")
-    col2.write("---")
-
-    #retrieve the genes of the module via selection
-    sup_mrna_stage = sup_mrna_stage.set_index("external_gene_name")
-    sup_mrna_mod = sup_mrna_stage[sup_mrna_stage["cluster"] == module_sel].iloc[:,2:-1]
+    
+    #retrieve the genes of the module via selection 
+    sup_mrna_mod = con.execute(f"Select * from sup_mrna WHERE cluster='{module_sel}'").fetchdf()
+    sup_mrna_mod = sup_mrna_mod.set_index("gene_name").iloc[:,1:-1]
     sup_mrna_mod.columns = index
-    sup_mrna_mod = pd.melt(sup_mrna_mod.reset_index(), id_vars = "external_gene_name").set_index("external_gene_name")
-
+    sup_mrna_mod = pd.melt(sup_mrna_mod.reset_index(), id_vars = "gene_name").set_index("gene_name")
 
     #gene enrichments for the selected cluster
-    mod_gene_enr = gene_enr[gene_enr["cluster"] == module_sel]
-
+    mod_gene_enr = con.execute("Select * from gprofiler_enr WHERE cluster='{module_sel}'").fetchdf()
     #check if user wants to search for hub-genes
-    hub = hub_genes() # retrun the hub genes
-
+   
     # draw the plot and the network
     fig1 = plot_writing(sup_mrna_mod,"miRNA Module Trajectory") # put the axis within the context
     interactive_figure = draw_network(hub, sup_mrna, module_sel)
@@ -176,7 +135,7 @@ def plot_writing(mean_mrna, title):
     return mean_figure
     
 
-def draw_network(hub_genes, expression, selection, ax = None):
+def draw_network(con, selection, ax = None):
     """Show Top 30 hub-gene networks for each module
     Drawing is based on Correlation above 0.7 and correlation is determined using pearson correlation
     
@@ -188,12 +147,12 @@ def draw_network(hub_genes, expression, selection, ax = None):
     returns:
         interactive_figure --> plotly figure
     """
-    hub_genes_module = hub_genes[hub_genes["Module"]== selection] # select 
     
-    
+    hub_genes_module = con.execute(f"Select external_gene_name from hub_genes WHERE Module='{selection}'").fetchdf()["external_gene_name"].tolist()
     # retrieve the correlation matrix for futher network analysis using the correlatio as weight
-    blum = list(hub_genes_module["external_gene_name"])
-    genes_corr = expression[expression["external_gene_name"].isin(blum)].set_index("external_gene_name").iloc[:,2:-1].T.corr(method = "pearson") #correlation of top 30 hubs
+    hub_genes_module = tuple(hub_genes_module)
+    genes_corr = con.execute("Select * from sup_mrna WHERE external_gene_name IN")
+    genes_corr = expression[expression["external_gene_name"].isin(hub_genes_module)].set_index("external_gene_name").iloc[:,2:-1].T.corr(method = "pearson") #correlation of top 30 hubs
     corr_net = genes_corr.stack() # stack the correlation to get a linkage table
     corr_net.index = corr_net.index.set_names(['gene',"gene2"])
     corr_net = corr_net.reset_index()

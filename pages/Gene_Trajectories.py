@@ -3,46 +3,20 @@ import pandas as pd
 import plotly.express as px
 from scipy.stats import zscore
 import altair as alt
+import duckdb
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_data(data_path):
     """
     should load the parquet files to retrieve the tables
     """
-
-    columns = [[i]*3 for i in ["Day00", "Day05","Day09","Day16", "Day26", "Day36"]] * 3
-    columns = [t for i in columns for t in i]
-
-    columns_to_skip = ["Unnamed: 0"]
-    dataframe_dictionary = {}
-    supercluster_mrna = pd.read_parquet(data_path + "all_mirna_mRNA_trajectories.parquet").iloc[:21467,:]
-
-    # transcript per million loading
-    tpm_end = pd.read_parquet(data_path + "cell-line_average_mean_tpm.parquet")
-    tpm_end = tpm_end.set_index("gene_name")
-
-    # load multimapper miRNA
-    five_p = pd.read_parquet(data_path + "miRNA_nc_multimappers_5p.parquet").drop("mean", axis = 1).set_index("Name")
-    three_p = pd.read_parquet(data_path + "miRNA_nc_multimappers_3p.parquet").drop("mean", axis = 1).set_index("Name")
-
-    nc_rna_counts = pd.read_parquet(data_path + "vsd_counts_ncRNA_excerpt.parquet").set_index("Unnamed: 0")
-    nc_rna_counts.columns = columns
+    try:
+        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
+        return con
+    except:
+        print("Error")
     
-    
-    significance = pd.read_parquet(data_path +"excerpt_sig.parquet").drop("Unnamed: 0", axis = 1)
-    significance.columns = ["ncRNA", "baseMean", "FDR-correct p-value"]
-    significance["significant?"] = ["significant" if i < 0.05 else "not significant" for i in significance["FDR-correct p-value"]]
-
-    dataframe_dictionary.update({"supercluster_mrna":supercluster_mrna,
-                                 "tpm_end": tpm_end, 
-                                 "five_p": five_p, 
-                                 "three_p": three_p, 
-                                 "ncRNA_counts": nc_rna_counts,
-                                 "significance": significance})
-
-    return dataframe_dictionary
-
-def trajectory_start(dataframe_dict):
+def trajectory_start(con):
 
     """
     Make the selection of the genes and draw the trajectories that belong to the genes
@@ -52,21 +26,21 @@ def trajectory_start(dataframe_dict):
         tpm_end: pd.DataFrame -> all gene tpms
         
     """
-    
+    print(con)
     tab1, tab2, tab3 = st.tabs(["mRNA and miRNA Trajectories", "miRNA with Multimapper", "ncRNA Trajectories (Excerpt)"]) 
-    selected_draw = dataframe_dict["supercluster_mrna"]["Unnamed: 0"].tolist()
+    selected_draw = con.execute("SELECT gene_name from vsd_counts").fetchnumpy()["gene_name"]
 
     #retrieve the genes for selection for searching
     gene_queried = tab1.multiselect("Gene or miRNA:", selected_draw)
     tab1.write("---")
 
     #retrieve the mirnas for selection for searching
-    mirna_select = dataframe_dict["five_p"].index.tolist() + dataframe_dict["three_p"].index.tolist()
+    mirna_select = con.execute("SELECT gene_name from fivep_counts").fetchnumpy()["gene_name"].tolist() + con.execute("SELECT gene_name from threep_counts").fetchnumpy()["gene_name"].tolist()
     mirna_select = sorted(list(set(mirna_select)))
     mirna_queried = tab2.multiselect("Select miRNA: ", mirna_select)
     tab2.write("---")
     #ncRNA 
-    nc_select = dataframe_dict["ncRNA_counts"].index.tolist()
+    nc_select = con.execute("SELECT gene_name from ncrna_counts").fetchnumpy()["gene_name"].tolist()
     nc_queried = tab3.multiselect("Select ncRNA: ", nc_select)
     tab3.write("---")
 
@@ -74,15 +48,15 @@ def trajectory_start(dataframe_dict):
     draw_information_layout()
 
     if gene_queried:
-        preprocess_tpm_vsd(gene_queried, dataframe_dict["supercluster_mrna"],dataframe_dict["tpm_end"],tab1) 
+        preprocess_tpm_vsd(gene_queried,con,tab1) 
 
     if mirna_queried:
-        mirna_multimap_drawing(mirna_queried, dataframe_dict["five_p"], dataframe_dict["three_p"], tab2)
+        mirna_multimap_drawing(mirna_queried,con, tab2)
 
     if nc_queried:
-        nc_multimap_drawing(nc_queried, dataframe_dict["ncRNA_counts"],dataframe_dict["significance"],tab3)
+        nc_multimap_drawing(nc_queried,con,tab3)
 
-def preprocess_tpm_vsd(genes_liste, df, tpm_end,tab):
+def preprocess_tpm_vsd(genes_liste,con,tab):
 
     """ Preprocess the Tables of genes for normalized counts and tpm before drawing
     args:
@@ -91,23 +65,24 @@ def preprocess_tpm_vsd(genes_liste, df, tpm_end,tab):
         tab: selected tab to draw figures
     """
 
-    # make a tabbed sheet 
-    df_curv = df.set_index("Unnamed: 0") # set name column as index
+    # make a tabbed sheet  # set name column as index
     columns = ["DAY00","DAY00","DAY00",
                "DAY05","DAY05","DAY05",
                "DAY09","DAY09","DAY09",
                "DAY16","DAY16","DAY16",
                "DAY26","DAY26","DAY26",
                "DAY36","DAY36","DAY36"]
-    df_curv.columns = columns #unified Data columns for making the line and scatterplots
-    df_curves = df_curv[df_curv.index.isin(genes_liste)].sort_index().reset_index()
-    df_curves = pd.melt(df_curves, id_vars = "Unnamed: 0") # melt the table
+    genes = tuple(genes_liste)
+    df_curves = con.execute(f"SELECT * from vsd_counts WHERE gene_name IN {genes}").fetchdf().set_index("gene_name")
+    df_curves.columns = columns
+    
+    df_curves = pd.melt(df_curves.reset_index(), id_vars = "gene_name") # melt the table
     df_curves.columns = ["Gene Name","Timepoint","z-scored variance stabilized counts"]
 
     # preprocess the tpm table
-    tpm_end.columns = columns
-    tpm_curves = tpm_end[tpm_end.index.isin(genes_liste)].sort_index().reset_index()
-    tpm_curves = pd.melt(tpm_curves,id_vars = "gene_name")
+    tpm_curves = con.execute(f"SELECT * from tpm_counts WHERE gene_name IN {genes}").fetchdf().set_index("gene_name")
+    tpm_curves.columns = columns
+    tpm_curves = pd.melt(tpm_curves.reset_index(),id_vars = "gene_name")
     tpm_curves.columns = ["Gene Name","Timepoint","TPM (Transcript per Million)"]
     
     # check the shapes of the dataframe 
@@ -141,7 +116,7 @@ def make_trajectories(df_curves, tpm_curves = None, tab = None):
         vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name")
         col1.write(vsd_figure)
 
-def mirna_multimap_drawing(searched_mirna, five, three,tab):
+def mirna_multimap_drawing(searched_mirna, con,tab):
     """ Make drawings for the miRNA multimappers
     args:
         five: pd.DataFrame -> data for five prime miRNAs
@@ -150,14 +125,23 @@ def mirna_multimap_drawing(searched_mirna, five, three,tab):
     """
 
     col1, col2 = tab.columns(2)
-    columns_zelline = ["Day00","Day00","Day00","Day05","Day05","Day05","Day09","Day09","Day09","Day16","Day16","Day16","Day26","Day26","Day26","Day36","Day36","Day36"]
+    searched_mirna = tuple(searched_mirna)
+    columns_zelline = ["gene_name","Day00","Day00","Day00",
+                       "Day05","Day05","Day05",
+                       "Day09","Day09","Day09",
+                       "Day16","Day16","Day16",
+                       "Day26","Day26","Day26",
+                       "Day36","Day36","Day36"]
+    
+    
+    five = con.execute(f"SELECT * from fivep_counts WHERE gene_name IN {searched_mirna}").fetchdf()
+    three = con.execute(f"SELECT * from threep_counts WHERE gene_name IN {searched_mirna}").fetchdf()
     five.columns = columns_zelline
     three.columns = columns_zelline
-    five_p_mirna = five[five.index.isin(searched_mirna)].reset_index()
-    three_p_mirna = three[three.index.isin(searched_mirna)].reset_index()
-    five_p_mirna = pd.melt(five_p_mirna, id_vars=["Name"])
+    
+    five_p_mirna = pd.melt(five, id_vars=["gene_name"])
     five_p_mirna.columns = ["miRNA","Timepoint","Raw Counts"]
-    three_p_mirna = pd.melt(three_p_mirna, id_vars=["Name"])
+    three_p_mirna = pd.melt(three, id_vars=["gene_name"])
     three_p_mirna.columns = ["miRNA","Timepoint","Raw Counts"]
     
     if (five_p_mirna.shape[0] > 0 and three_p_mirna.shape[0] > 0):
@@ -180,28 +164,32 @@ def mirna_multimap_drawing(searched_mirna, five, three,tab):
     else:
         st.error("Connection Timeout, or selected miRNA not present in list!")
         
-def nc_multimap_drawing(nc_queried, nc_data, significance,tab):
+def nc_multimap_drawing(nc_queried, con,tab):
     """
     """
 
     col1, col2 = tab.columns(2)
+    columns = [3* [i] for i in ["Day00", "Day05", "Day09", "Day16", "Day26", "Day36"]] *3
+    columns = [t for i in columns for t in i]
+    columns = ["gene_name"] + columns
+    nc_queried = tuple(nc_queried)
+    nc_data = con.execute(f"SELECT * from ncrna_counts WHERE gene_name IN {nc_queried}").fetchdf()
+    nc_data.columns = columns
+    nc_data = nc_data.set_index("gene_name")
     nc_data_query = nc_data.apply(zscore, axis = 1)
-    nc_data_query = nc_data_query[nc_data_query.index.isin(nc_queried)].reset_index()
-    nc_melt = pd.melt(nc_data_query, id_vars=["Unnamed: 0"])
+    nc_data_query = nc_data_query.reset_index()
+    nc_melt = pd.melt(nc_data_query, id_vars=["gene_name"])
     nc_melt.columns = ["ncRNA", "Timepoint", "z-scored variance stabilized counts"]
     nc_figure = draw_altair_graph(nc_melt, "z-scored variance stabilized counts", gene_annotation = "ncRNA")
     col1.write(nc_figure)
     
     
-    nc_sig = significance[significance["ncRNA"].isin(nc_queried)]
+    nc_sig = con.execute(f"SELECT * from significance WHERE ncRNA IN {nc_queried}").fetchdf()
     
     #nc_sig.applymap(lambda x: 'background-color: red' if x > 0.01 else 'background-color: green', subset='padj')
     col2.write("ncRNA Differential Gene Expression Information:")
     col2.dataframe(nc_sig)
     
-    
-
-
 def draw_altair_graph(data_draw, value, gene_annotation = None):
     selection = alt.selection_multi(fields=[gene_annotation], bind='legend')
     chart = (
@@ -242,5 +230,5 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
 if __name__ == "__main__":
 
     data_path = "./Data/"   
-    dataframe_dictionary = load_data(data_path)
-    trajectory_start(dataframe_dictionary) 
+    connection = load_data(data_path)
+    trajectory_start(connection) 

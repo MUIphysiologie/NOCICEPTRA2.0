@@ -8,48 +8,37 @@ import statsmodels.api as sm
 import holoviews as hv
 from holoviews import opts, dim
 import requests
+import duckdb
 
 hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def load_data(data_path):
-
     """
+    should load the parquet files to retrieve the tables
     """
+    try:
+        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
+        return con
+    except:
+        print("Error")
 
-    kegg_pathway = pd.read_parquet(data_path + "kegg_pathway.parquet")
-    super_cluster_statistics = pd.read_parquet(data_path + "gene_general.parquet")
-    super_cluster_counts = pd.read_parquet(data_path + "gene_general_counting.parquet")
-    chord_diagram = pd.read_parquet(data_path + "mirna_edges.parquet")
-    string_interaction = pd.read_parquet(data_path +"string_hsa_preprocess.parquet")
-    string_interaction["score"] = string_interaction["combined_score"].apply(lambda x: x/1000)
-    string_interaction_high = string_interaction.loc[string_interaction["score"] >= 0.4]
-    diseases = pd.read_parquet(data_path + "all_gene_disease_associations.parquet")
-
-    dataframe_dictionary = {"kegg_pathway": kegg_pathway,
-                            "super_cluster_statistics":super_cluster_statistics,
-                            "super_cluster_counts": super_cluster_counts,
-                            "string_interaction_high": string_interaction_high,
-                            "chord_diagram":chord_diagram,
-                            "disease": diseases}
-  
-    return dataframe_dictionary
-
-def kegg_disease_analysis(dataframe_dictionary):
-    tab1, tab2, tab3 = st.tabs(["KEGG Network","Disease Network", "miRNA Networks (BETA)"])
-    kegg_decision = tab1.selectbox("Please select your KEGG pathway:", dataframe_dictionary["kegg_pathway"]["gene_name"].tolist())
-    kegg_id = dataframe_dictionary["kegg_pathway"][dataframe_dictionary["kegg_pathway"]["gene_name"] == kegg_decision]["ID"].tolist()[0]
+def kegg_disease_analysis(con):
+    tab1, tab2, tab3 = st.tabs(["KEGG Network","Disease Network", "miRNA Networks (BETA)"]) 
+    kegg_decision = tab1.selectbox("Please select your KEGG pathway:", con.execute("Select gene_name from kegg_pathway").fetchnumpy()["gene_name"].tolist())
+    kegg_id = con.execute(f"Select gene_name, ID from kegg_pathway WHERE gene_name='{kegg_decision}'").fetchdf()["ID"].tolist()[0]
     resulting_gene_list = get_kegg(kegg_id)
+    super_cluster_statistics = con.execute("Select * from super_cluster_statistics").fetchdf()
+    super_cluster_counts = con.execute("Select * from super_cluster_counts").fetchdf()
     statistics, p_value = gene_set_kegg_enrichment(resulting_gene_list,
-                                                   dataframe_dictionary["super_cluster_statistics"],
-                                                   dataframe_dictionary["super_cluster_counts"])
+                                                   super_cluster_statistics,
+                                                   super_cluster_counts)
 
 
     st.sidebar.info("Please select you KEGG/Disease pathway or the miRNA of interest to derive enriched genes throughout iPSC-derived sensory neuron development")
 
     make_chart(resulting_gene_list, 
-               dataframe_dictionary["chord_diagram"],
-               dataframe_dictionary["string_interaction_high"],
+               con,
                statistics = statistics,
                p_value = p_value,
                tab = tab1
@@ -57,32 +46,37 @@ def kegg_disease_analysis(dataframe_dictionary):
 
 
     # also evaluate the disease gene interaction
-    disease_selection = dataframe_dictionary["disease"]["diseaseName"].unique()
+    disease_selection = con.execute("Select diseaseName from diseases").fetchdf()["diseaseName"].unique()
     diesase_selected = tab2.selectbox("Please select the Disease of Interest:", disease_selection)
     show_labels = tab2.checkbox("Show labels in rich plots", value = True)
-
-    # here we check the label size
-    if diesase_selected:
-        if tab2.button("Create Disease Network"):
-            tab2.write("------")
-            disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
-            disstats, dis_pval = gene_set_kegg_enrichment(disease_genes, 
-                                                        dataframe_dictionary["super_cluster_statistics"],
-                                                        dataframe_dictionary["super_cluster_counts"])
-            make_chart(disease_genes, 
-                    dataframe_dictionary["chord_diagram"],
-                    dataframe_dictionary["string_interaction_high"][dataframe_dictionary["string_interaction_high"]["score"] > 0.95],
-                    statistics = disstats,
-                    p_value = dis_pval,
-                    tab = tab2,
-                    checkbox = show_labels
-                    ) 
-
-    # 
-    mirna = tab3.selectbox("Choose your miRNA:", dataframe_dictionary["chord_diagram"]["mirna"].unique())
+    run_disease_analysis(con, diesase_selected, show_labels,super_cluster_statistics,super_cluster_counts, tab2)
+    
+    
+    #
+    selected_mirnas = con.execute("Select mirna from chord_diagram").fetchdf()["mirna"].unique()
+    mirna = tab3.selectbox("Choose your miRNA:", selected_mirnas)
     target_score = tab3.slider("Target-Score Treshold (considers only values above the threshold)", min_value = 0, max_value = 200, step = 1, value = 75)
+    
+    if tab3.button("Start miNRA analysis:"):
+        get_mirna_information(mirna, con,target_score, tab3)
 
-    get_mirna_information(mirna,dataframe_dictionary["chord_diagram"], dataframe_dictionary["string_interaction_high"],target_score, tab3)
+
+def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statistics, super_cluster_counts, tab):
+    
+    if tab.button("Start Analysis:"):
+        disease_genes = con.execute(f"Select geneSymbol from diseases WHERE diseaseName='{diesase_selected}'").fetchnumpy()["geneSymbol"].tolist()
+        #disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
+        disstats, dis_pval = gene_set_kegg_enrichment(disease_genes, super_cluster_statistics,
+                                                super_cluster_counts)
+        make_chart(disease_genes,con,
+                statistics = disstats,
+                p_value = dis_pval,
+                tab = tab,
+                checkbox = show_labels,
+                threshold = 0.95
+                ) 
+
+
 
 def get_kegg(kegg_pathway):
     """ REST API: 
@@ -122,7 +116,7 @@ def get_kegg(kegg_pathway):
 def gene_set_kegg_enrichment(genes_list, genes_query, genes_baseline):
 
     """ Here we write a function to define contigency table of observed genes and expected genes"""
-    genes_diagram = genes_baseline.set_index("Unnamed: 0.1")
+    genes_diagram = genes_baseline.set_index("stage")
     genes_expected = genes_query[genes_query["external_gene_name"].isin(genes_list)] # queried genes
     genes_expected = pd.DataFrame(genes_expected["supercluster_gene"].value_counts())
 
@@ -141,7 +135,7 @@ def gene_set_kegg_enrichment(genes_list, genes_query, genes_baseline):
     bars = enrichments_residuals.iloc[:,1] # retrieve the pearson residuals
     return bars, p_value
 
-def make_chart(genes, mirna_genes, string_interaction_high, disease_mirna = None,  mirna = None, statistics = None, p_value = None, mirna_name = None, tab = None, checkbox = True):
+def make_chart(genes, con, disease_mirna = None,  mirna = None, statistics = None, p_value = None, mirna_name = None, tab = None, checkbox = True, threshold = 0.4):
 
     """
     miRNA and mRNA network analyis, build a bokeh plot
@@ -150,10 +144,8 @@ def make_chart(genes, mirna_genes, string_interaction_high, disease_mirna = None
 
     """
 
-    links = get_interaction(genes, string_interaction_high).drop("score", axis = 1)
-    cluster = mirna_genes[["gene_name","supercluster_gene"]].drop_duplicates()
-    node = get_node_table_hv(mirna_genes, links, genes, cluster)
-
+    links = get_interaction(genes, con, threshold).drop("score", axis = 1)
+    node = get_node_table_hv(con, links, genes)
 
     links.columns = ["source","target","value"]
     links = links[links["source"].isin(node["gene_name"])]
@@ -185,20 +177,16 @@ def make_chart(genes, mirna_genes, string_interaction_high, disease_mirna = None
     else:
         tab.warning("No enrichments found check your internet connection")
         
-def get_node_table_hv(mirna_genes, links, genes, cluster):
+def get_node_table_hv(con, links, genes):
     """
     """
-    mirna_genes = mirna_genes[mirna_genes["score"]>50]
-    mirna_genes = mirna_genes[mirna_genes["gene_name"].isin(genes)]
-    mirna_degree = mirna_genes.copy(deep = True)
-    mirnas = mirna_genes.copy(deep = True)
-    gene_mirna = mirna_genes.groupby(["mirna"])["score"].mean()
-    count_mirna = mirna_genes["mirna"].value_counts()
-    mirna_genes = mirna_genes.groupby(["gene_name"])["score"].agg("sum").reset_index()
-    mirna_genes = pd.merge(mirna_genes,cluster, how = "left", left_on = "gene_name",right_on = "gene_name")
+    genes = tuple(genes)
+    mirna_genes = con.execute(f"Select gene_name, supercluster_gene, score from chord_diagram WHERE gene_name IN {genes} AND score > 50").fetchdf()
+    mirna_genes = mirna_genes.groupby(["gene_name","supercluster_gene"])["score"].agg("sum").reset_index()
+    print(mirna_genes)
     node = mirna_genes[mirna_genes["gene_name"].isin(links["preferred_name_x"])]
     node = node[node["gene_name"].isin(links["preferred_name_y"])]
-
+    
     return node
 
 def get_indeces_hv(links, nodes):
@@ -235,7 +223,7 @@ def draw_table_info(p_value, colum_sel):
         Size of the Gene dots is defined by the cummulative miRNA target-score and edges weight are defined by the StringDB database confidence score. <br>
         The $chi-squared$ p-value of $\textbf{%f}$, indicates no significance''' %(p_value), unsafe_allow_html=True)
 
-def get_interaction(genes,string):
+def get_interaction(genes,con, threshold = 0.4):
 
     """ use the string DB database
 
@@ -245,10 +233,10 @@ def get_interaction(genes,string):
     - preferred_name_y --> target 
     - genes -> input 
     """
-
-    string_network = string[string["preferred_name_x"].isin(genes)]
-    string_end = string_network[string_network["preferred_name_y"].isin(genes)]
-    return string_end
+    genes = tuple(genes)
+    string_network = con.execute(f'Select * from string_interaction_high WHERE preferred_name_x IN {genes} AND preferred_name_y IN {genes} AND score>{threshold};').fetchdf()
+    print(string_network)
+    return string_network
 
 def chart_plot(node, index, mirna = None, checkbox = True):
  
@@ -366,7 +354,7 @@ def enrichments_genes(genes, species):
 
     return df_go_end
 
-def get_mirna_information(mirna, mirna_genes,string_interaction_high, target_score, tab):
+def get_mirna_information(mirna, con, target_score, tab):
 
     """ 
     positive --> above positive correlation (default = false, means below the queried correlation)
@@ -376,21 +364,21 @@ def get_mirna_information(mirna, mirna_genes,string_interaction_high, target_sco
     """
 
 
-    statistics_mirna = mirna_genes[(mirna_genes["score"] >= target_score) & (mirna_genes["correlation"] < -0.7)]
-    mirna_genes = mirna_genes[(mirna_genes["score"] >= target_score) & (mirna_genes["correlation"] < -0.7)]
+    #statistics_mirna = mirna_genes[(mirna_genes["score"] >= target_score) & (mirna_genes["correlation"] < -0.7)]
+    mirnas_stats = con.execute(f"Select * from chord_diagram WHERE score>{target_score} AND correlation<-0.7").fetchdf()
+    #mirna_genes = mirna_genes[(mirna_genes["score"] >= target_score) & (mirna_genes["correlation"] < -0.7)]
 
-    targeted_mirna = mirna_genes[mirna_genes["mirna"]==mirna]
+    targeted_mirna = mirnas_stats[mirnas_stats["mirna"]==mirna]
 
     mirna_target_genes = set(targeted_mirna["gene_name"].tolist())
-    statistics,p_value = mirna_enrichments_statistics(statistics_mirna, mirna)
+    statistics,p_value = mirna_enrichments_statistics(mirnas_stats, mirna)
     statistics = statistics.iloc[:,1]
     #draw a plot for the statistics
 
     #check how lenghty the genes list
     if len(mirna_target_genes) > 10:
         
-        make_chart(mirna_target_genes, mirna_genes,
-                   string_interaction_high,
+        make_chart(mirna_target_genes,con,
                    disease_mirna = None,
                    mirna = True,
                    statistics = statistics,
