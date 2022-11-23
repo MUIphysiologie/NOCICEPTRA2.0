@@ -80,11 +80,12 @@ def experimental_description(con):
 
     #gene enrichments for the selected cluster
     mod_gene_enr = con.execute("Select * from gprofiler_enr WHERE cluster='{module_sel}'").fetchdf()
+    print(mod_gene_enr)
     #check if user wants to search for hub-genes
    
     # draw the plot and the network
     fig1 = plot_writing(sup_mrna_mod,"miRNA Module Trajectory") # put the axis within the context
-    interactive_figure = draw_network(hub, sup_mrna, module_sel)
+    interactive_figure = draw_network(con, module_sel)
 
     # correctly order it into the app
     col1.write(interactive_figure)
@@ -95,18 +96,16 @@ def experimental_description(con):
     
     
     #miRNA trajectories for each module
-    modules_mirna = list(set(sup_mirna["cluster"]))
+    modules_mirna = con.execute("Select cluster from sup_mirna").fetchdf()["cluster"].unique()
     tab2.write("Select your Module of Interest:")
     module_mirna_sel = tab2.selectbox("", modules_mirna)
     tab2.write("-----")
 
     # retrieve the modules for miRNA analysis
-    sup_mirna = sup_mirna.set_index("Row.names")
-    sup_mirna = sup_mirna[sup_mirna["cluster"] == module_mirna_sel].iloc[:,2:-1]
+    sup_mirna = con.execute(f"Select * from sup_mirna WHERE cluster='{module_mirna_sel}'").fetchdf().set_index("gene_name").iloc[:,1:-1]
     sup_mirna.columns = index
-    sup_mirna_mod = pd.melt(sup_mirna.reset_index(), id_vars = "Row.names").set_index("Row.names")
-    mod_mirna_enr = mirna_enr[mirna_enr["miRNA module"] == module_mirna_sel]
-   
+    sup_mirna_mod = pd.melt(sup_mirna.reset_index(), id_vars = "gene_name").set_index("gene_name")
+    mod_mirna_enr = con.execute(f"Select * from mirna_enr WHERE mirna_moduel='{module_mirna_sel}'").fetchdf()   
     sup_mirna.columns = columns
 
     # set up the layout
@@ -116,7 +115,7 @@ def experimental_description(con):
   
     # write the figurse
     mirna_1.write(mirna_fig)
-    mirna_2.write(mod_mirna_enr.set_index("Pathway")[["P-value","Term"]].iloc[:10,:])
+    mirna_2.write(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:])
 
 
     # put the dataframe into the expander and style it like a heatmap
@@ -151,8 +150,9 @@ def draw_network(con, selection, ax = None):
     hub_genes_module = con.execute(f"Select external_gene_name from hub_genes WHERE Module='{selection}'").fetchdf()["external_gene_name"].tolist()
     # retrieve the correlation matrix for futher network analysis using the correlatio as weight
     hub_genes_module = tuple(hub_genes_module)
-    genes_corr = con.execute("Select * from sup_mrna WHERE external_gene_name IN")
-    genes_corr = expression[expression["external_gene_name"].isin(hub_genes_module)].set_index("external_gene_name").iloc[:,2:-1].T.corr(method = "pearson") #correlation of top 30 hubs
+    genes_corr = con.execute(f"Select * from sup_mrna WHERE gene_name IN {hub_genes_module}").fetchdf().set_index("gene_name").iloc[:,2:-1].T.corr(method = "pearson")
+    print(genes_corr)
+    #genes_corr = expression[expression["external_gene_name"].isin(hub_genes_module)].set_index("external_gene_name").iloc[:,2:-1].T.corr(method = "pearson") #correlation of top 30 hubs
     corr_net = genes_corr.stack() # stack the correlation to get a linkage table
     corr_net.index = corr_net.index.set_names(['gene',"gene2"])
     corr_net = corr_net.reset_index()
