@@ -4,6 +4,11 @@ import plotly.express as px
 from scipy.stats import zscore
 import altair as alt
 import duckdb
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import plotly.express as px
+
 
 @st.cache(allow_output_mutation=True)
 def load_data(data_path):
@@ -13,8 +18,8 @@ def load_data(data_path):
     try:
         con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
         return con
-    except:
-        print("Error")
+    except Exception as e:
+        print(f"Error: {e}")
     
 def trajectory_start(con):
 
@@ -27,8 +32,12 @@ def trajectory_start(con):
         
     """
     print(con)
-    tab1, tab2, tab3 = st.tabs(["mRNA and miRNA Trajectories", "miRNA with Multimapper", "ncRNA Trajectories (Excerpt)"]) 
-    selected_draw = con.execute("SELECT gene_name from vsd_counts").fetchnumpy()["gene_name"]
+    tab1, tab2, tab3, tab4 = st.tabs(["mRNA and miRNA Trajectories",
+                                      "miRNA with Multimapper",
+                                      "ncRNA Trajectories (Excerpt)",
+                                      "lncRNA Trajectories"]) 
+    
+    selected_draw = sorted(con.execute("SELECT gene_name from vsd_counts").fetchnumpy()["gene_name"])
 
     #retrieve the genes for selection for searching
     gene_queried = tab1.multiselect("Gene or miRNA:", selected_draw)
@@ -43,6 +52,9 @@ def trajectory_start(con):
     nc_select = con.execute("SELECT gene_name from ncrna_counts").fetchnumpy()["gene_name"].tolist()
     nc_queried = tab3.multiselect("Select ncRNA: ", nc_select)
     tab3.write("---")
+    
+    lnc_select = con.execute("Select external_gene_name from lnc_counts").fetchdf()
+    lnc_queried = tab4.multiselect("Select your lncRNA of interest: ", lnc_select["external_gene_name"].tolist())
 
     # here the layout of the sidebar should be added
     draw_information_layout()
@@ -55,7 +67,12 @@ def trajectory_start(con):
 
     if nc_queried:
         nc_multimap_drawing(nc_queried,con,tab3)
-
+        
+    if lnc_queried:
+        lnc_query_genes(lnc_queried, con, tab4)
+        
+        
+        
 def preprocess_tpm_vsd(genes_liste,con,tab):
 
     """ Preprocess the Tables of genes for normalized counts and tpm before drawing
@@ -91,7 +108,70 @@ def preprocess_tpm_vsd(genes_liste,con,tab):
 
     else:
         make_trajectories(df_curves, None, tab)
+    
+    
+    #make the cellline plot
+    
+    col1, col2 = tab.columns(2)
+    col1.write("---")
+    col2.write("---")
+    genes_queried = con.execute(f"Select * from all_counts WHERE gene_name IN {tuple(genes_liste)}").fetchdf().set_index("gene_name")
+    meta_data_table = con.execute("Select * from mrna_metadata").fetchdf()
+    print(meta_data_table)
+    cell_line_specific_printing(genes_queried, meta_data_table, col1)
+    genes_liste = tuple(genes_liste)
+    if len(genes_liste) >= 3:
+        correlation_matrix_analysis(genes_queried, genes_liste, col2)
+        
+    elif len(genes_liste) == 2:
+        scatter_comparison(genes_queried, genes_liste, col2)
+    
+    
+def cell_line_specific_printing(genes_queried,metadata_table, col1):
+    columns = [3* [i] for i in ["Day00", "Day05", "Day09", "Day16", "Day26", "Day36"]] *3
+    columns = [t for i in columns for t in i]
+    
+    metadata_table["Timepoint"] = columns
+    gene_cell_line = genes_queried.copy().reset_index()
+    melted_queried = pd.melt(gene_cell_line, id_vars="gene_name")
+    melted_queried = pd.merge(melted_queried, metadata_table, left_on = "variable", right_on = "samples",how = "left")
+    print(melted_queried)
+    cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
+    selected_table = melted_queried[melted_queried["cell_line"] == cell_select]
+    fig = draw_altair_graph(selected_table, "value", "gene_name")
+    col1.write(fig)
+    
   
+def scatter_comparison(genes_queried, genes_liste, col2):
+    """"""
+    genes_queried = genes_queried.T
+    max = genes_queried.to_numpy().max()
+    min = genes_queried.to_numpy().min()
+    fig = alt.Chart(genes_queried).mark_circle(size=60).encode(
+    x= alt.X(str(genes_liste[0]), scale=alt.Scale(domain=[min-0.2, max+0.2])),
+    y=alt.Y(str(genes_liste[1]), scale=alt.Scale(domain=[min-0.2, max+0.2])),
+        ).interactive().properties(width=550, height = 400)
+    
+    final  = fig.configure_legend(padding=2,
+                                    cornerRadius=5,
+                                    orient='bottom').configure_axis(grid = False, 
+                                                                      labelFontSize = 13).configure_view(strokeOpacity = 0)
+    #final_figure = fig + fig.transform_regression(str(genes_liste[0]),str(genes_liste[1])).mark_line()
+    col2.write(final)
+    
+    
+def correlation_matrix_analysis(genes_queried, genes_liste, col2):
+    """"""
+    
+    genes_queried = genes_queried.T.corr()
+    mask = np.triu(np.ones_like(genes_queried, dtype=bool))
+    fig = px.imshow(genes_queried, 
+                    color_continuous_scale='Viridis',
+                    text_auto=True,
+                    aspect="auto",
+                    title="Correlation Matrix between queried Genes")
+    col2.write(fig)
+                       
 def draw_information_layout():
     st.sidebar.subheader("InfoBox")
     st.sidebar.info("Please Search for your gene/miRNA or ncRNA of interest by using the multiSelect panel shown in each Tab. The Panels will be automatically updated!")
@@ -196,7 +276,7 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
                 alt.Chart(data_draw)
                 .mark_boxplot(size = 30)
                 .encode(x=alt.X("Timepoint"),
-                        y=alt.Y(value),
+                        y=alt.Y(value, scale=alt.Scale(domain=[data_draw[value].min()-1, data_draw[value].max()+1])),
                         color=gene_annotation,
                         opacity=alt.condition(selection, alt.value(1), alt.value(0.2)))
                 .interactive()
@@ -209,7 +289,7 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
             .mark_line(interpolate = "natural")
             .encode(x=alt.X("Timepoint",
                             scale=alt.Scale(padding=1)),
-                            y=alt.Y(f"mean({value})"),
+                            y=alt.Y(f"mean({value})",scale=alt.Scale(domain=[data_draw[value].min()-1, data_draw[value].max()+1])),
                             color=gene_annotation,
                             opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
                             size=alt.condition(~selection, alt.value(1), alt.value(3)))
@@ -224,6 +304,19 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
                                                                       labelFontSize = 13).configure_view(strokeOpacity = 0)
     return final
 
+def lnc_query_genes(genes_liste, con, tab):
+    columns = [9*[i] for i in ["Day00", "Day05", "Day09", "Day16", "Day26", "Day36"]]
+    columns = [t for i in columns for t in i]
+    columns = ["gene_name"] + columns
+   
+    selected_lncs = con.execute(f"Select * from lnc_counts WHERE external_gene_name IN {tuple(genes_liste)}").fetchdf()
+    selected_lncs.columns = columns
+    melted_selected_lncs = pd.melt(selected_lncs, id_vars="gene_name")
+    melted_selected_lncs.columns = ["gene_name","Timepoint", "vsd counts"]
+    print(melted_selected_lncs)
+    fig = draw_altair_graph(melted_selected_lncs, "vsd counts", "gene_name" )
+    tab.write("---")
+    tab.write(fig)
 
 
 
