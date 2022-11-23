@@ -13,7 +13,7 @@ import plotly.express as px
 @st.experimental_singleton
 def load_data():
     """
-    should load the parquet files to retrieve the tables
+    Defines the database connection to the NOCICEPTRA duckdb database
     """
     try:
         con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
@@ -126,6 +126,12 @@ def preprocess_tpm_vsd(genes_liste,con,tab):
     
     
 def cell_line_specific_printing(genes_queried,metadata_table, col1):
+    """ Print the trajectoreis for the selected genes for the cell line specifically
+    Args: 
+        genes_queried: list -> selected genes
+        metadata_table: pd.DataFrame --> table that hold the sample and timepoint information
+        col1: st.tabs.col --> tab and column where this figure should be drawn
+    """
     columns = [3* [i] for i in ["Day00", "Day05", "Day09", "Day16", "Day26", "Day36"]] *3
     columns = [t for i in columns for t in i]
     
@@ -139,8 +145,13 @@ def cell_line_specific_printing(genes_queried,metadata_table, col1):
     col1.write(fig)
     
   
-def scatter_comparison(genes_queried, genes_liste, col2):
-    """"""
+def scatter_comparison(genes_queried: list, genes_liste:list, col2):
+    """ two selected genes scatter correlation analysis
+    Args:
+        genes_queried: list -> selected genes from mulitselect
+        genes_list: list
+        cols2: st.tabs.cols
+    """
     genes_queried = genes_queried.T
     max = genes_queried.to_numpy().max()
     min = genes_queried.to_numpy().min()
@@ -157,8 +168,13 @@ def scatter_comparison(genes_queried, genes_liste, col2):
     col2.write(final)
     
     
-def correlation_matrix_analysis(genes_queried, genes_liste, col2):
-    """"""
+def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
+    """
+    Draws the correlation matrix form the selected data
+    Args:
+        genes_queried: list -> list of selected genes
+        
+    """
     
     genes_queried = genes_queried.T.corr()
     mask = np.triu(np.ones_like(genes_queried, dtype=bool))
@@ -241,8 +257,12 @@ def mirna_multimap_drawing(searched_mirna, con,tab):
     else:
         st.error("Connection Timeout, or selected miRNA not present in list!")
         
-def nc_multimap_drawing(nc_queried, con,tab):
+def nc_multimap_drawing(nc_queried: list, con: duckdb,tab):
     """
+    Draws the ncRNAs 
+    nc_queried: list -> selected ncRNAs
+    con: duckdb -> duckdb connection
+    tab: st.tabs -> tab where data should drawn in
     """
 
     col1, col2 = tab.columns(2)
@@ -268,6 +288,12 @@ def nc_multimap_drawing(nc_queried, con,tab):
     col2.dataframe(nc_sig)
     
 def draw_altair_graph(data_draw, value, gene_annotation = None):
+    """ Draws the trajectories as altair graph
+    Args:
+        data_draw: pd.DataFrame -> preselected data of genes
+        value: str -> should be the column that holds the normalized data
+        gene_annotation: str -> columns that is holding the hue
+    """
     selection = alt.selection_multi(fields=[gene_annotation], bind='legend')
     chart = (
                 alt.Chart(data_draw)
@@ -302,6 +328,12 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
     return final
 
 def lnc_query_genes(genes_liste, con, tab):
+    """ Queries lncRNA genes from the duckdb database
+    Args:
+        genes_liste: list -> list of selected lncRNAs
+        con: duckdb -> duckdb database
+        tab: st.tab -> streamlit tab 
+    """
     columns = [9*[i] for i in ["Day00", "Day05", "Day09", "Day16", "Day26", "Day36"]]
     columns = [t for i in columns for t in i]
     columns = ["gene_name"] + columns
