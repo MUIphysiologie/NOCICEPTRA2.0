@@ -10,8 +10,8 @@ import numpy as np
 import plotly.express as px
 
 
-@st.cache(allow_output_mutation=True)
-def load_data(data_path):
+@st.experimental_singleton
+def load_data():
     """
     should load the parquet files to retrieve the tables
     """
@@ -31,7 +31,6 @@ def trajectory_start(con):
         tpm_end: pd.DataFrame -> all gene tpms
         
     """
-    print(con)
     tab1, tab2, tab3, tab4 = st.tabs(["mRNA and miRNA Trajectories",
                                       "miRNA with Multimapper",
                                       "ncRNA Trajectories (Excerpt)",
@@ -117,7 +116,6 @@ def preprocess_tpm_vsd(genes_liste,con,tab):
     col2.write("---")
     genes_queried = con.execute(f"Select * from all_counts WHERE gene_name IN {tuple(genes_liste)}").fetchdf().set_index("gene_name")
     meta_data_table = con.execute("Select * from mrna_metadata").fetchdf()
-    print(meta_data_table)
     cell_line_specific_printing(genes_queried, meta_data_table, col1)
     genes_liste = tuple(genes_liste)
     if len(genes_liste) >= 3:
@@ -135,7 +133,6 @@ def cell_line_specific_printing(genes_queried,metadata_table, col1):
     gene_cell_line = genes_queried.copy().reset_index()
     melted_queried = pd.melt(gene_cell_line, id_vars="gene_name")
     melted_queried = pd.merge(melted_queried, metadata_table, left_on = "variable", right_on = "samples",how = "left")
-    print(melted_queried)
     cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
     selected_table = melted_queried[melted_queried["cell_line"] == cell_select]
     fig = draw_altair_graph(selected_table, "value", "gene_name")
@@ -313,7 +310,6 @@ def lnc_query_genes(genes_liste, con, tab):
     selected_lncs.columns = columns
     melted_selected_lncs = pd.melt(selected_lncs, id_vars="gene_name")
     melted_selected_lncs.columns = ["gene_name","Timepoint", "vsd counts"]
-    print(melted_selected_lncs)
     fig = draw_altair_graph(melted_selected_lncs, "vsd counts", "gene_name" )
     tab.write("---")
     tab.write(fig)
@@ -321,7 +317,5 @@ def lnc_query_genes(genes_liste, con, tab):
 
 
 if __name__ == "__main__":
-
-    data_path = "./Data/"   
-    connection = load_data(data_path)
+    connection = load_data()
     trajectory_start(connection) 

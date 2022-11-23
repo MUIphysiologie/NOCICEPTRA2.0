@@ -10,8 +10,8 @@ import duckdb
 
 
 
-@st.cache(allow_output_mutation=True)
-def load_data(data_path):
+@st.experimental_singleton
+def load_data():
     """
     should load the parquet files to retrieve the tables
     """
@@ -332,7 +332,6 @@ def draw_altair_graph(data_draw,title, gene_annotation = None):
 
 
 if __name__ == "__main__":
-    data_path = "./Data/"   
-    dataframe_dictionary = load_data(data_path)
+    dataframe_dictionary = load_data()
     exploratory_data_analysis(dataframe_dictionary) 
 

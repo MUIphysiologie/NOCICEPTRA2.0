@@ -13,7 +13,7 @@ import duckdb
 hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
 
 @st.cache(allow_output_mutation=True)
-def load_data(data_path):
+def load_data():
     """
     should load the parquet files to retrieve the tables
     """
@@ -423,6 +423,5 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
     return enrichments_residuals, p_value
 
 if __name__ == "__main__":
-    data_path = "./Data/"
-    dataframe_dictionary = load_data(data_path)
+    dataframe_dictionary = load_data()
     kegg_disease_analysis(dataframe_dictionary)
