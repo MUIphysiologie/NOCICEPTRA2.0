@@ -9,23 +9,25 @@ import altair as alt
 import duckdb 
 
 
-
 @st.experimental_singleton
 def load_data():
     """
-    should load the parquet files to retrieve the tables
+    Defines the database connection to the NOCICEPTRA duckdb database
     """
     try:
+        print("Try to connect to the database")
         con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
         return con
-    except:
-        print("Error")
+    except Exception as e:
+        print(f"Error: {e}")
 
-def exploratory_data_analysis(con):
+
+def exploratory_data_analysis():
     """ start the analysis 
     args:
         data_dict: dict -> dictionary with all dataframe
     """
+    con = load_data()
     experimental_description(con)
 
   
@@ -79,8 +81,7 @@ def experimental_description(con):
     sup_mrna_mod = pd.melt(sup_mrna_mod.reset_index(), id_vars = "gene_name").set_index("gene_name")
 
     #gene enrichments for the selected cluster
-    mod_gene_enr = con.execute("Select * from gprofiler_enr WHERE cluster='{module_sel}'").fetchdf()
-    print(mod_gene_enr)
+    mod_gene_enr = con.execute(f"Select * from gprofiler_enr WHERE cluster='{module_sel}'").fetchdf()
     #check if user wants to search for hub-genes
    
     # draw the plot and the network
@@ -88,8 +89,8 @@ def experimental_description(con):
     interactive_figure = draw_network(con, module_sel)
 
     # correctly order it into the app
-    col1.write(interactive_figure)
-    col2.write(fig1)
+    col1.plotly_chart(interactive_figure, use_container_width = True)
+    col2.altair_chart(fig1, use_container_width = True)
     tab1.write("---")
     tab1.write("Enrichment Analysis:")
     tab1.table(mod_gene_enr.set_index("description")[["p-value","source"]].iloc[:10,:])
@@ -114,8 +115,8 @@ def experimental_description(con):
     mirna_fig = plot_writing(sup_mirna_mod, "miRNA Module Trajectory")
   
     # write the figurse
-    mirna_1.write(mirna_fig)
-    mirna_2.write(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:])
+    mirna_1.altair_chart(mirna_fig, use_container_width = True)
+    mirna_2.dataframe(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:], use_container_width = True)
 
 
     # put the dataframe into the expander and style it like a heatmap
@@ -151,7 +152,6 @@ def draw_network(con, selection, ax = None):
     # retrieve the correlation matrix for futher network analysis using the correlatio as weight
     hub_genes_module = tuple(hub_genes_module)
     genes_corr = con.execute(f"Select * from sup_mrna WHERE gene_name IN {hub_genes_module}").fetchdf().set_index("gene_name").iloc[:,2:-1].T.corr(method = "pearson")
-    print(genes_corr)
     #genes_corr = expression[expression["external_gene_name"].isin(hub_genes_module)].set_index("external_gene_name").iloc[:,2:-1].T.corr(method = "pearson") #correlation of top 30 hubs
     corr_net = genes_corr.stack() # stack the correlation to get a linkage table
     corr_net.index = corr_net.index.set_names(['gene',"gene2"])
@@ -181,7 +181,6 @@ def draw_interactive_network(gene_network):
     """
     module = "skyblue"
     degree = gene_network.degree()
-    values = [t for i, t in degree]
     pos = nx.spring_layout(gene_network)
 
     
@@ -240,7 +239,7 @@ def draw_interactive_network(gene_network):
     fig = go.Figure(data=[edge_trace, node_trace],
         layout=go.Layout(
         width = 600,
-        height = 800,
+        height = 450,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
@@ -267,36 +266,6 @@ def draw_interactive_network(gene_network):
                  # draw the corresponding genes
     return fig
 
-def update_figure_layout(px_figure, title = None):
-    """Function to update the figure layout of the network
-    args:
-        px_figure: plotly figure -> input figures
-        title: str -> name of the figure
-    returns:
-        plotly figure
-    """
-    px_figure.update_layout(
-                            title=title,
-                            template = "simple_white",
-                            width = 600,
-                            height = 600,
-                            yaxis=dict(
-                                autorange=True,
-                                showgrid=False,
-                                zeroline=True,
-                                zerolinecolor='rgb(255, 255, 255)',
-                                zerolinewidth=2,
-                            ),
-                            margin=dict(
-                                l=40,
-                                r=30,
-                                b=80,
-                                t=100,
-                            ),
-                            showlegend=True
-                        )
-                    
-    return px_figure
 
 def draw_altair_graph(data_draw,title, gene_annotation = None):
     """ Draw the altai graph boxplot with lines
@@ -332,6 +301,5 @@ def draw_altair_graph(data_draw,title, gene_annotation = None):
 
 
 if __name__ == "__main__":
-    dataframe_dictionary = load_data()
-    exploratory_data_analysis(dataframe_dictionary) 
+    exploratory_data_analysis() 
 

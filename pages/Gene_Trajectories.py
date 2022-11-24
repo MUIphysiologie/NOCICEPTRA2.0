@@ -4,11 +4,8 @@ import plotly.express as px
 from scipy.stats import zscore
 import altair as alt
 import duckdb
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
 import plotly.express as px
-
 
 @st.experimental_singleton
 def load_data():
@@ -16,12 +13,13 @@ def load_data():
     Defines the database connection to the NOCICEPTRA duckdb database
     """
     try:
+        print("Try to connect to the database")
         con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
         return con
     except Exception as e:
         print(f"Error: {e}")
-    
-def trajectory_start(con):
+
+def trajectory_start():
 
     """
     Make the selection of the genes and draw the trajectories that belong to the genes
@@ -31,28 +29,25 @@ def trajectory_start(con):
         tpm_end: pd.DataFrame -> all gene tpms
         
     """
+    con = load_data()
     tab1, tab2, tab3, tab4 = st.tabs(["mRNA and miRNA Trajectories",
                                       "miRNA with Multimapper",
                                       "ncRNA Trajectories (Excerpt)",
                                       "lncRNA Trajectories"]) 
     
-    selected_draw = sorted(con.execute("SELECT gene_name from vsd_counts").fetchnumpy()["gene_name"])
+    selected_draw, mirna_select,nc_select, lnc_select = execute_fill_list(con)
 
     #retrieve the genes for selection for searching
     gene_queried = tab1.multiselect("Gene or miRNA:", selected_draw)
     tab1.write("---")
 
     #retrieve the mirnas for selection for searching
-    mirna_select = con.execute("SELECT gene_name from fivep_counts").fetchnumpy()["gene_name"].tolist() + con.execute("SELECT gene_name from threep_counts").fetchnumpy()["gene_name"].tolist()
     mirna_select = sorted(list(set(mirna_select)))
     mirna_queried = tab2.multiselect("Select miRNA: ", mirna_select)
     tab2.write("---")
     #ncRNA 
-    nc_select = con.execute("SELECT gene_name from ncrna_counts").fetchnumpy()["gene_name"].tolist()
     nc_queried = tab3.multiselect("Select ncRNA: ", nc_select)
     tab3.write("---")
-    
-    lnc_select = con.execute("Select external_gene_name from lnc_counts").fetchdf()
     lnc_queried = tab4.multiselect("Select your lncRNA of interest: ", lnc_select["external_gene_name"].tolist())
 
     # here the layout of the sidebar should be added
@@ -142,7 +137,7 @@ def cell_line_specific_printing(genes_queried,metadata_table, col1):
     cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
     selected_table = melted_queried[melted_queried["cell_line"] == cell_select]
     fig = draw_altair_graph(selected_table, "value", "gene_name")
-    col1.write(fig)
+    col1.altair_chart(fig, use_container_width = True)
     
   
 def scatter_comparison(genes_queried: list, genes_liste:list, col2):
@@ -165,7 +160,7 @@ def scatter_comparison(genes_queried: list, genes_liste:list, col2):
                                     orient='bottom').configure_axis(grid = False, 
                                                                       labelFontSize = 13).configure_view(strokeOpacity = 0)
     #final_figure = fig + fig.transform_regression(str(genes_liste[0]),str(genes_liste[1])).mark_line()
-    col2.write(final)
+    col2.altair_chart(final, use_container_width = True)
     
     
 def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
@@ -183,7 +178,7 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
                     text_auto=True,
                     aspect="auto",
                     title="Correlation Matrix between queried Genes")
-    col2.write(fig)
+    col2.plotly_chart(fig, use_container_width = True)
                        
 def draw_information_layout():
     st.sidebar.subheader("InfoBox")
@@ -201,13 +196,13 @@ def make_trajectories(df_curves, tpm_curves = None, tab = None):
         tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
         # write the figure into the ap
         col1.empty()
-        col1.write(vsd_figure)
-        col2.write(tpm_figure)
+        col1.altair_chart(vsd_figure,use_container_width = True)
+        col2.altair_chart(tpm_figure,use_container_width= True)
 
     else:
         st.markdown("---")
         vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name")
-        col1.write(vsd_figure)
+        col1.altair_chart(vsd_figure, use_container_width = True)
 
 def mirna_multimap_drawing(searched_mirna, con,tab):
     """ Make drawings for the miRNA multimappers
@@ -241,18 +236,18 @@ def mirna_multimap_drawing(searched_mirna, con,tab):
         five_figure = draw_altair_graph(five_p_mirna,"Raw Counts", "miRNA")
         three_figure = draw_altair_graph(three_p_mirna,"Raw Counts","miRNA")
     
-        col1.write(five_figure)
-        col2.write(three_figure)
+        col1.altair_chart(five_figure,use_container_width = True)
+        col2.altair_chart(three_figure, use_container_width = True)
         
     elif (five_p_mirna.shape[0] == 0 and three_p_mirna.shape[0] > 0):
         col1.info("No counts identified for five prime miRNA")
         three_figure = draw_altair_graph(three_p_mirna,"Raw Counts","miRNA")
-        col2.write(three_figure)
+        col2.altair_chart(three_figure, use_container_width = True)
         
     elif (five_p_mirna.shape[0] > 0 and three_p_mirna.shape[0] == 0):
         col2.info("No counts identified for three prime miRNA")
         five_figure = draw_altair_graph(five_p_mirna,"Raw Counts", "miRNA")
-        col1.write(five_figure)
+        col1.write(five_figure, use_container_width = True)
          
     else:
         st.error("Connection Timeout, or selected miRNA not present in list!")
@@ -278,14 +273,14 @@ def nc_multimap_drawing(nc_queried: list, con: duckdb,tab):
     nc_melt = pd.melt(nc_data_query, id_vars=["gene_name"])
     nc_melt.columns = ["ncRNA", "Timepoint", "z-scored variance stabilized counts"]
     nc_figure = draw_altair_graph(nc_melt, "z-scored variance stabilized counts", gene_annotation = "ncRNA")
-    col1.write(nc_figure)
+    col1.altair_chart(nc_figure, use_container_width = True)
     
     
     nc_sig = con.execute(f"SELECT * from significance WHERE ncRNA IN {nc_queried}").fetchdf()
     
     #nc_sig.applymap(lambda x: 'background-color: red' if x > 0.01 else 'background-color: green', subset='padj')
     col2.write("ncRNA Differential Gene Expression Information:")
-    col2.dataframe(nc_sig)
+    col2.dataframe(nc_sig, use_container_width = True)
     
 def draw_altair_graph(data_draw, value, gene_annotation = None):
     """ Draws the trajectories as altair graph
@@ -303,7 +298,7 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
                         color=gene_annotation,
                         opacity=alt.condition(selection, alt.value(1), alt.value(0.2)))
                 .interactive()
-                .properties(width=550)
+                .properties(width='container', height = 'container')
                 .add_selection(selection)
                 )
         
@@ -317,7 +312,7 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
                             opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
                             size=alt.condition(~selection, alt.value(1), alt.value(3)))
             .interactive()
-            .properties(width=550, height = 400)
+            .properties(width=500, height = 400)
             .add_selection(selection))
                                                 
     final = chart_line + chart
@@ -347,7 +342,14 @@ def lnc_query_genes(genes_liste, con, tab):
     tab.write(fig)
 
 
+@st.experimental_singleton
+def execute_fill_list(_con):
+    draw = [i for i in sorted(_con.execute("SELECT gene_name from vsd_counts").fetchnumpy()["gene_name"]) if "." not in i]
+    mirna = _con.execute("SELECT gene_name from fivep_counts").fetchnumpy()["gene_name"].tolist() + _con.execute("SELECT gene_name from threep_counts").fetchnumpy()["gene_name"].tolist()
+    nc = _con.execute("SELECT gene_name from ncrna_counts").fetchnumpy()["gene_name"].tolist()
+    lnc = _con.execute("Select external_gene_name from lnc_counts").fetchdf()
+    return (draw, mirna, nc, lnc) 
+
 
 if __name__ == "__main__":
-    connection = load_data()
-    trajectory_start(connection) 
+    trajectory_start() 

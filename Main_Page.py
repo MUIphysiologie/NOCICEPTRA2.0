@@ -1,13 +1,21 @@
 # Import all the modules necessary for the Tool
 import streamlit as st 
-from bokeh.themes.theme import Theme
-import holoviews as hv
+import duckdb
 
 
-st.set_page_config(page_title = "NOCICEPTRA",layout="wide") # set the tab name
-hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
-data_path = "./Data/"
-
+st.set_page_config(page_title = "NOCICEPTRA",layout="wide") 
+# set the tab name #draw interactive visualization using holoviews
+st.session_state.update(st.session_state)
+@st.experimental_singleton
+def load_data():
+    """
+    Defines the database connection to the NOCICEPTRA duckdb database
+    """
+    try:
+        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
+        st.session_state.connection = con
+    except Exception as e:
+        print(f"Error: {e}")
 
 def main():
     """
@@ -16,9 +24,12 @@ def main():
 
     #set the logo
     st.sidebar.image("./Images/Logo_iPSC.png", output_format = "png", width = 200)
+    load_data()
     start_page()
 
 
+        
+    
 def start_page():
     """ layout of the Webpage for the susceptibility windows"""
     st.image("./Images/Logo_iPSC.png", output_format = "png", use_column_width = True)

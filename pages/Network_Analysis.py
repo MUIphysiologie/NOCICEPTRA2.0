@@ -12,20 +12,24 @@ import duckdb
 
 hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
 
-@st.cache(allow_output_mutation=True)
+@st.experimental_singleton
 def load_data():
     """
-    should load the parquet files to retrieve the tables
+    Defines the database connection to the NOCICEPTRA duckdb database
     """
     try:
+        print("Try to connect to the database")
         con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
         return con
-    except:
-        print("Error")
+    except Exception as e:
+        print(f"Error: {e}")
 
-def kegg_disease_analysis(con):
+
+def kegg_disease_analysis():
+    con = load_data()
     tab1, tab2, tab3 = st.tabs(["KEGG Network","Disease Network", "miRNA Networks (BETA)"]) 
-    kegg_decision = tab1.selectbox("Please select your KEGG pathway:", con.execute("Select gene_name from kegg_pathway").fetchnumpy()["gene_name"].tolist())
+    selected_kegg, disease_selection, selected_mirnas = execute_fill_list_pathways(con)
+    kegg_decision = tab1.selectbox("Please select your KEGG pathway:",selected_kegg)
     kegg_id = con.execute(f"Select gene_name, ID from kegg_pathway WHERE gene_name='{kegg_decision}'").fetchdf()["ID"].tolist()[0]
     resulting_gene_list = get_kegg(kegg_id)
     super_cluster_statistics = con.execute("Select * from super_cluster_statistics").fetchdf()
@@ -46,14 +50,12 @@ def kegg_disease_analysis(con):
 
 
     # also evaluate the disease gene interaction
-    disease_selection = con.execute("Select diseaseName from diseases").fetchdf()["diseaseName"].unique()
     diesase_selected = tab2.selectbox("Please select the Disease of Interest:", disease_selection)
     show_labels = tab2.checkbox("Show labels in rich plots", value = True)
     run_disease_analysis(con, diesase_selected, show_labels,super_cluster_statistics,super_cluster_counts, tab2)
     
     
     #
-    selected_mirnas = con.execute("Select mirna from chord_diagram").fetchdf()["mirna"].unique()
     mirna = tab3.selectbox("Choose your miRNA:", selected_mirnas)
     target_score = tab3.slider("Target-Score Treshold (considers only values above the threshold)", min_value = 0, max_value = 200, step = 1, value = 75)
     
@@ -164,7 +166,7 @@ def make_chart(genes, con, disease_mirna = None,  mirna = None, statistics = Non
     chord_diagram = chart_plot(nodes, links_index, checkbox = checkbox)
     enrichment_diagram = enrichments_genes(nodes.data["gene_name"].tolist(),"hsapiens")
     
-    col_enr1.bokeh_chart(hv.render(chord_diagram, backend = "bokeh"))
+    col_enr1.bokeh_chart(hv.render(chord_diagram, backend = "bokeh"), use_container_width = True)
     draw_table_info(p_value,col_enr2)
     
     col_enr2.markdown(r""" **Table 1**:  Standardized Pearson residuals""")
@@ -183,7 +185,6 @@ def get_node_table_hv(con, links, genes):
     genes = tuple(genes)
     mirna_genes = con.execute(f"Select gene_name, supercluster_gene, score from chord_diagram WHERE gene_name IN {genes} AND score > 50").fetchdf()
     mirna_genes = mirna_genes.groupby(["gene_name","supercluster_gene"])["score"].agg("sum").reset_index()
-    print(mirna_genes)
     node = mirna_genes[mirna_genes["gene_name"].isin(links["preferred_name_x"])]
     node = node[node["gene_name"].isin(links["preferred_name_y"])]
     
@@ -235,7 +236,6 @@ def get_interaction(genes,con, threshold = 0.4):
     """
     genes = tuple(genes)
     string_network = con.execute(f'Select * from string_interaction_high WHERE preferred_name_x IN {genes} AND preferred_name_y IN {genes} AND score>{threshold};').fetchdf()
-    print(string_network)
     return string_network
 
 def chart_plot(node, index, mirna = None, checkbox = True):
@@ -248,31 +248,29 @@ def chart_plot(node, index, mirna = None, checkbox = True):
 
     if checkbox is True:
     #draw th echord plot
-        chord = hv.Chord((index, node)).opts(opts.Chord(hooks=[set_toolbar_autohide],
+        chord = hv.Chord((index, node)).opts(opts.Chord(hooks=[hook],
                                             cmap="Paired",
                                             edge_cmap="tab20",
                                             edge_color=dim("trial").str(),
                                             node_color=dim('supercluster_gene').str(),
-                                            edge_line_width = 1,
-                                            width = 500, 
-                                            height = 500, 
+                                            edge_line_width = 1, 
                                             node_size = dim("score")/400, 
                                             fontsize = {"labels":0.5},
                                             node_line_width = 1, 
+                                            height = 500,
                                             labels = dim("gene_name").str()))
         return chord
 
     else:
-        chord = hv.Chord((index, node)).opts(opts.Chord(hooks=[set_toolbar_autohide],
+        chord = hv.Chord((index, node)).opts(opts.Chord(hooks=[hook],
                                             cmap="Paired",
                                             edge_cmap="tab20",
                                             edge_color=dim("trial").str(),
                                             node_color=dim('supercluster_gene').str(),
                                             edge_line_width = 1,
-                                            width = 500, 
-                                            height = 500, 
                                             fontsize = {"labels":0.5},
-                                            node_line_width = 1
+                                            node_line_width = 1,
+                                            height = 500
                                             ))
         return chord
 
@@ -422,6 +420,21 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
    
     return enrichments_residuals, p_value
 
+def hook(plot, example):
+    print("function is working")
+    print('plot.state:   ', plot.state)
+    print('plot.handles: ', sorted(plot.handles.keys()))
+    plot.handles["plot"].background_fill_alpha= 0
+    plot.handles["plot"].border_fill_alpha= 0
+    plot.handles["text_1_glyph"].text_color = "grey"
+
+@st.experimental_singleton
+def execute_fill_list_pathways(_con):
+    print("loaded the data")
+    kegg = _con.execute("Select gene_name from kegg_pathway").fetchnumpy()["gene_name"].tolist()
+    disease = _con.execute("Select diseaseName from diseases").fetchdf()["diseaseName"].unique()
+    mirna = _con.execute("Select mirna from chord_diagram").fetchdf()["mirna"].unique()
+    return (kegg,disease, mirna) 
+
 if __name__ == "__main__":
-    dataframe_dictionary = load_data()
-    kegg_disease_analysis(dataframe_dictionary)
+    kegg_disease_analysis()
