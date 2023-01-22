@@ -1,12 +1,12 @@
 import streamlit as st 
 import pandas as pd
-import plotly.express as px
 from scipy.stats import zscore
-import matplotlib.pyplot as plt
 import networkx as nx
 import plotly.graph_objects as go
 import altair as alt
 import duckdb 
+import matplotlib.pyplot as plt
+import matplotlib
 
 
 @st.experimental_singleton
@@ -115,7 +115,7 @@ def experimental_description(con):
   
     # write the figurse
     mirna_1.altair_chart(mirna_fig, use_container_width = True)
-    mirna_2.dataframe(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:], use_container_width = True)
+    mirna_2.write(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:])
 
 
     # put the dataframe into the expander and style it like a heatmap
@@ -123,8 +123,8 @@ def experimental_description(con):
     heatmap_exp =  tab2.expander("Show miRNA DataFrame:")
     heatmap_exp.write("------")
     heatmap_exp.header("miRNA DataFrame")
-    heatmap_exp.dataframe(sup_mirna.style.background_gradient(cmap ='viridis', axis = 1)\
-        .set_properties(**{'font-size': '15px'}).set_caption("Hello World"), width = 1400)
+    heatmap_exp.write(sup_mirna.style.background_gradient(cmap ='viridis', axis = 1)\
+        .set_properties(**{'font-size': '15px'}).set_caption("Hello World"))
 
 def plot_writing(mean_mrna, title):
     """ write a lineplot for the expresssion counts 
@@ -231,12 +231,12 @@ def draw_interactive_network(gene_network):
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
         hovermode='closest',
-        margin=dict(b=20,l=5,r=5,t=5),
+        margin=dict(l=5,r=5,t=5),
         annotations=[ dict(
             showarrow=True,
             xref="paper", yref="paper",
             x=0.05, y=-0.002 ) ],
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, ticks =""),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, ticks = ""),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, ticks = ""))
     )
 
@@ -268,7 +268,7 @@ def draw_altair_graph(data_draw,title, gene_annotation = None):
                 .mark_boxplot(size = 30)
                 .encode(x=alt.X("Timepoint"), y=alt.Y("z-score variance stabilized counts"))
                 .interactive()
-                .properties(width=550, title = title)
+                .properties(title = title)
                 )
         
     chart_line = (
@@ -276,7 +276,7 @@ def draw_altair_graph(data_draw,title, gene_annotation = None):
             .mark_line(interpolate = "natural")
             .encode(x="Timepoint", y="mean(z-score variance stabilized counts)")
             .interactive()
-            .properties(width=550, height = 450))
+            .properties())
                                                 
     final = chart_line + chart
     final  = final.configure_legend(padding=10,

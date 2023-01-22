@@ -251,7 +251,6 @@ def chart_plot(node, index, mirna = None, checkbox = True):
             opts.Chord(
                 hooks=[hook],
                 cmap="Paired",
-                edge_cmap="tab20",
                 edge_color=dim("trial").str(),
                 node_color=dim('supercluster_gene').str(),
                 edge_line_width=1,
@@ -267,7 +266,6 @@ def chart_plot(node, index, mirna = None, checkbox = True):
             opts.Chord(
                 hooks=[hook],
                 cmap="Paired",
-                edge_cmap="tab20",
                 edge_color=dim("trial").str(),
                 node_color=dim('supercluster_gene').str(),
                 edge_line_width=1,

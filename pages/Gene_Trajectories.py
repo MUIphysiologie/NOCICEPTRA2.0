@@ -140,6 +140,7 @@ def cell_line_specific_printing(genes_queried,metadata_table, col1):
     
   
 def scatter_comparison(genes_queried: list, genes_liste:list, col2):
+    # sourcery skip: avoid-builtin-shadow
     """ two selected genes scatter correlation analysis
     Args:
         genes_queried: list -> selected genes from mulitselect
