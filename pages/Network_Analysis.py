@@ -234,44 +234,49 @@ def get_interaction(genes,con, threshold = 0.4):
     - genes -> input 
     """
     genes = tuple(genes)
-    string_network = con.execute(f'Select * from string_interaction_high WHERE preferred_name_x IN {genes} AND preferred_name_y IN {genes} AND score>{threshold};').fetchdf()
-    return string_network
+    return con.execute(
+        f'Select * from string_interaction_high WHERE preferred_name_x IN {genes} AND preferred_name_y IN {genes} AND score>{threshold};'
+    ).fetchdf()
 
 def chart_plot(node, index, mirna = None, checkbox = True):
- 
+
     """ two different networks
     mirna -> if miRNA is queried or not
     node -> a dataset of all nodes involved in the network
     index -> a network adjacency matrix of all interactions
     """
 
-    if checkbox is True:
-    #draw th echord plot
-        chord = hv.Chord((index, node)).opts(opts.Chord(hooks=[hook],
-                                            cmap="Paired",
-                                            edge_cmap="tab20",
-                                            edge_color=dim("trial").str(),
-                                            node_color=dim('supercluster_gene').str(),
-                                            edge_line_width = 1, 
-                                            node_size = dim("score")/400, 
-                                            fontsize = {"labels":0.5},
-                                            node_line_width = 1, 
-                                            height = 500,
-                                            labels = dim("gene_name").str()))
-        return chord
-
-    else:
-        chord = hv.Chord((index, node)).opts(opts.Chord(hooks=[hook],
-                                            cmap="Paired",
-                                            edge_cmap="tab20",
-                                            edge_color=dim("trial").str(),
-                                            node_color=dim('supercluster_gene').str(),
-                                            edge_line_width = 1,
-                                            fontsize = {"labels":0.5},
-                                            node_line_width = 1,
-                                            height = 500
-                                            ))
-        return chord
+    return (
+        hv.Chord((index, node)).opts(
+            opts.Chord(
+                hooks=[hook],
+                cmap="Paired",
+                edge_cmap="tab20",
+                edge_color=dim("trial").str(),
+                node_color=dim('supercluster_gene').str(),
+                edge_line_width=1,
+                node_size=dim("score") / 400,
+                fontsize={"labels": 0.5},
+                node_line_width=1,
+                height=500,
+                labels=dim("gene_name").str(),
+            )
+        )
+        if checkbox is True
+        else hv.Chord((index, node)).opts(
+            opts.Chord(
+                hooks=[hook],
+                cmap="Paired",
+                edge_cmap="tab20",
+                edge_color=dim("trial").str(),
+                node_color=dim('supercluster_gene').str(),
+                edge_line_width=1,
+                fontsize={"labels": 0.5},
+                node_line_width=1,
+                height=500,
+            )
+        )
+    )
 
 
 def set_toolbar_autohide(plot, element):
@@ -398,7 +403,7 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
     #detect the number of genes belonging to each cluster, remove duplicates
     genes_diagram = mirna_targets[["gene_name","supercluster_gene"]]
     genes_diagram = genes_diagram.drop_duplicates(keep = "first")["supercluster_gene"].value_counts()
-    
+
     #search for the queried miRNA and count cluster occurences
     mirna_diagram = mirna_targets.loc[mirna_targets["mirna"].str.contains(mirna, case = False)]
     mirna_diagram = mirna_diagram[["gene_name","supercluster_gene"]]
@@ -406,7 +411,7 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
 
     #merge both tables
     end = pd.merge(pd.DataFrame(genes_diagram),mirna_diagram, how = "left", left_index = True, right_index = True)
-    end = end.fillna(int(0)) #fill the nan with 0 for further analysis
+    end = end.fillna(0)
     ending = end
     #ending = ending[["supercluster_gene_y", "supercluster_gene_x"]]
     #statistical analysis via contigency table
@@ -415,8 +420,8 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
     enrichments_residuals = pd.DataFrame(table.resid_pearson)
     enrichments_residuals.columns = ["observed_genes","expected_genes"]
     p_value = rslt.pvalue
-    
-   
+
+
     return enrichments_residuals, p_value
 
 def hook(plot, example):
