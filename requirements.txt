@@ -41,8 +41,6 @@ plotly-express==0.4.1
 protobuf==3.20.3
 pyct==0.4.8
 pydeck==0.8.0
-Pygments==2.14.0
-PyGObject==3.42.2
 Pympler==1.0.1
 pyparsing==3.0.9
 pyrsistent==0.19.3
