@@ -19,8 +19,7 @@ def load_data():
     """
     try:
         print("Try to connect to the database")
-        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
-        return con
+        return duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
     except Exception as e:
         print(f"Error: {e}")
 
@@ -87,14 +86,14 @@ def get_kegg(kegg_pathway):
     """
     #get the patway
     pathway = kegg_pathway
-    url = "http://rest.kegg.jp/get/%s"%(pathway) #retrieve the url from the kegg database
+    url = f"http://rest.kegg.jp/get/{pathway}"
     genes_liste =[] # make an empty gene list that will be filled with the genes
     #connect to KEGG URL
 
     http.client.HTTPConnection._http_vsn = 10
     http.client.HTTPConnection._http_vsn_str = 'HTTP/1.0' # avoid version problems arising between http and python
 
-    
+
     with urllib.request.urlopen(url) as f:
         lines = f.read().decode('utf-8').splitlines()
         want = 0
@@ -124,7 +123,7 @@ def gene_set_kegg_enrichment(genes_list, genes_query, genes_baseline):
 
     #merging of genes from the kegg enrichments
     gesamt = pd.merge(genes_diagram, genes_expected, how = "left", left_index = True, right_index = True)
-    gesamt = gesamt.fillna(int(0))
+    gesamt = gesamt.fillna(0)
 
     #table statistics and summary
     table = sm.stats.Table(gesamt)
@@ -173,8 +172,8 @@ def make_chart(genes, con, disease_mirna = None,  mirna = None, statistics = Non
     col_enr2.table(statistics)
 
     if enrichment_diagram.shape[0] > 0:
-        col2.markdown(r""" **Table 2**: G:Profiler enrichments""")
-        col2.table(enrichment_diagram.set_index("description"))
+        ccol_enr2.markdown(r""" **Table 2**: G:Profiler enrichments""")
+        col_enr2.table(enrichment_diagram.set_index("description"))
 
     else:
         tab.warning("No enrichments found check your internet connection")

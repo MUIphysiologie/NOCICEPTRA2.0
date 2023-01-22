@@ -16,8 +16,7 @@ def load_data():
     """
     try:
         print("Try to connect to the database")
-        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
-        return con
+        return duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
     except Exception as e:
         print(f"Error: {e}")
 
@@ -130,9 +129,7 @@ def experimental_description(con):
 def plot_writing(mean_mrna, title):
     """ write a lineplot for the expresssion counts 
     mean_mrna: pd.DataFrame -> dataframe that contains the mean expression"""
-    #determine the axi
-    mean_figure = draw_altair_graph(mean_mrna, title)
-    return mean_figure
+    return draw_altair_graph(mean_mrna, title)
     
 
 def draw_network(con, selection, ax = None):
@@ -161,14 +158,12 @@ def draw_network(con, selection, ax = None):
 
     #draw the network
     network_hub = nx.from_pandas_edgelist(corr_net, "target", "source","corr")
-    interactive_figure = draw_interactive_network(network_hub)
-    return interactive_figure
+    return draw_interactive_network(network_hub)
 
 @st.cache()
 def hub_genes():
     """load the hub-genes, this might take a while an will be cached to avoid long loading times """
-    hub_genes = pd.read_parquet("./Data/module_hubs_kme.parquet")
-    return hub_genes
+    return pd.read_parquet("./Data/module_hubs_kme.parquet")
 
 def draw_interactive_network(gene_network):
     """ Function to fill the interactive network graph using plotly from the gene network 
@@ -183,20 +178,15 @@ def draw_interactive_network(gene_network):
     degree = gene_network.degree()
     pos = nx.spring_layout(gene_network)
 
-    
+
     edge_x = []
     edge_y = []
 
     for edge in gene_network.edges():
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
-        edge_x.append(x0)
-        edge_x.append(x1)
-        edge_x.append(None)
-        edge_y.append(y0)
-        edge_y.append(y1)
-        edge_y.append(None)
-
+        edge_x.extend((x0, x1, None))
+        edge_y.extend((y0, y1, None))
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
         line=dict(width=0.5, color='#888'),
@@ -207,7 +197,7 @@ def draw_interactive_network(gene_network):
     node_y = []
     node_text = []
     node_hover = []
-    
+
     for node in gene_network.nodes():
         node_text.append(f"<b>{node}</b>")
         node_hover.append(node)
@@ -229,17 +219,14 @@ def draw_interactive_network(gene_network):
            ))
 
 
-    node_adjacencies = []
-    for node, adjacencies in enumerate(gene_network.adjacency()):
-        node_adjacencies.append(len(adjacencies[1]))
-
+    node_adjacencies = [
+        len(adjacencies[1]) for adjacencies in gene_network.adjacency()
+    ]
     #node_trace.marker.color = node_adjacencies
     node_trace.text = node_link
 
     fig = go.Figure(data=[edge_trace, node_trace],
         layout=go.Layout(
-        width = 600,
-        height = 450,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         showlegend=False,
@@ -262,8 +249,7 @@ def draw_interactive_network(gene_network):
             )
         )
 
-             
-                 # draw the corresponding genes
+
     return fig
 
 

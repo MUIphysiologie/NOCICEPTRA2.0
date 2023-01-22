@@ -14,8 +14,7 @@ def load_data():
     """
     try:
         print("Try to connect to the database")
-        con = duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
-        return con
+        return duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
     except Exception as e:
         print(f"Error: {e}")
 
