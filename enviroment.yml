@@ -2,7 +2,6 @@ name: neuroscience_beginner
 channels:
   - anaconda
   - conda-forge
-  - apple
   - defaults
 dependencies:
   - anyio=3.6.2=pyhd8ed1ab_0
@@ -39,10 +38,6 @@ dependencies:
   - jedi=0.18.1=py310hca03da5_1
   - jinja2=3.1.2=pyhd8ed1ab_1
   - jsonschema=4.17.3=pyhd8ed1ab_0
-  - jupyter_client=7.4.8=py310hca03da5_0
-  - jupyter_core=4.11.2=py310hca03da5_0
-  - jupyter_server=1.23.4=pyhd8ed1ab_0
-  - jupyterlab_pygments=0.2.2=pyhd8ed1ab_0
   - krb5=1.19.2=h3b8d789_0
   - libcurl=7.86.0=h0f1d93c_0
   - libcxx=14.0.6=h848a8c0_0
@@ -59,12 +54,6 @@ dependencies:
   - markupsafe=2.1.1=py310h1a28f6b_0
   - matplotlib-inline=0.1.2=pyhd3eb1b0_2
   - mistune=2.0.4=pyhd8ed1ab_0
-  - nbclassic=0.4.8=pyhd8ed1ab_0
-  - nbclient=0.5.13=pyhd8ed1ab_0
-  - nbconvert=7.2.7=pyhd8ed1ab_0
-  - nbconvert-core=7.2.7=pyhd8ed1ab_0
-  - nbconvert-pandoc=7.2.7=pyhd8ed1ab_0
-  - nbformat=5.7.1=pyhd8ed1ab_0
   - ncurses=6.3=h1a28f6b_3
   - nest-asyncio=1.5.6=py310hca03da5_0
   - notebook=6.5.2=pyha770c72_1
@@ -103,7 +92,6 @@ dependencies:
   - soupsieve=2.3.2.post1=pyhd8ed1ab_0
   - sqlite=3.40.0=h7a7dc30_0
   - stack_data=0.2.0=pyhd3eb1b0_0
-  - tensorflow-deps=2.9.0=0
   - terminado=0.17.1=pyhd1c38e8_0
   - tinycss2=1.2.1=pyhd8ed1ab_0
   - tk=8.6.12=hb8d0fd4_0
@@ -170,4 +158,5 @@ dependencies:
       - urllib3==1.26.14
       - validators==0.20.0
       - watchdog==2.2.1
+      - plotly-express==0.4.1
 prefix: /Users/maxzeidler/miniconda3/envs/neuroscience_beginner
