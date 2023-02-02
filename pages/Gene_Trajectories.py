@@ -6,7 +6,6 @@ import altair as alt
 import duckdb
 import numpy as np
 import plotly.express as px
-import altair_ally as aly
 
 @st.experimental_singleton
 def load_data():
