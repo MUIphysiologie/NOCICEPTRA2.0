@@ -6,6 +6,7 @@ import altair as alt
 import duckdb
 import numpy as np
 import plotly.express as px
+import altair_ally as aly
 
 @st.experimental_singleton
 def load_data():
@@ -13,7 +14,6 @@ def load_data():
     Defines the database connection to the NOCICEPTRA duckdb database
     """
     try:
-        print("Try to connect to the database")
         return duckdb.connect(database = "./Data/nociceptra.duckdb", read_only = True)
     except Exception as e:
         print(f"Error: {e}")
@@ -76,66 +76,104 @@ def preprocess_tpm_vsd(genes_liste,con,tab):
     """
 
     # make a tabbed sheet  # set name column as index
-    columns = ["DAY00","DAY00","DAY00",
-               "DAY05","DAY05","DAY05",
-               "DAY09","DAY09","DAY09",
-               "DAY16","DAY16","DAY16",
-               "DAY26","DAY26","DAY26",
-               "DAY36","DAY36","DAY36"]
     genes = tuple(genes_liste)
-    df_curves = con.execute(f"SELECT * from vsd_counts WHERE gene_name IN {genes}").fetchdf().set_index("gene_name")
-    df_curves.columns = columns
+    df_curves, df_original = get_counts_tables(con, genes)
+    metadata_table = con.execute("Select * from MetaDataTable").fetchdf()
+    df_curves = pd.merge(df_curves, metadata_table, how = "left", left_on = "samples", right_on = "samples")
+    print(df_curves)
+    tpm_curves = get_tpm_tables(con,genes)
+    # check logic if heatmap or boxplot
     
-    df_curves = pd.melt(df_curves.reset_index(), id_vars = "gene_name") # melt the table
-    df_curves.columns = ["Gene Name","Timepoint","z-scored variance stabilized counts"]
-
-    # preprocess the tpm table
-    tpm_curves = con.execute(f"SELECT * from tpm_counts WHERE gene_name IN {genes}").fetchdf().set_index("gene_name")
-    tpm_curves.columns = columns
-    tpm_curves = pd.melt(tpm_curves.reset_index(),id_vars = "gene_name")
-    tpm_curves.columns = ["Gene Name","Timepoint","TPM (Transcript per Million)"]
-    
-    # check the shapes of the dataframe 
     if tpm_curves.shape[0] > 0:
-        make_trajectories(df_curves, tpm_curves, tab)
-
+        if len(df_curves["Gene Name"].unique()) <= 5:
+            make_trajectories(df_curves, tpm_curves, tab)
+        else:
+            fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Gene Signatures")
+            tab.altair_chart(fig, use_container_width = True)
+        
     else:
-        make_trajectories(df_curves, None, tab)
+        if len(df_curves["Gene Name"].unique()) <= 5:
+            make_trajectories(df_curves, None, tab)
+        else:
+            fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Gene Signatures")
+            tab.altair_chart(fig, use_container_width = True)
     
     
     #make the cellline plot
-    
     col1, col2 = tab.columns(2)
     col1.write("---")
     col2.write("---")
-    genes_queried = con.execute(f"Select * from all_counts WHERE gene_name IN {tuple(genes_liste)}").fetchdf().set_index("gene_name")
-    meta_data_table = con.execute("Select * from mrna_metadata").fetchdf()
-    cell_line_specific_printing(genes_queried, meta_data_table, col1)
+    
+    
+    # here we check per celline
+    cell_line_specific_printing(df_curves, metadata_table, col1)
     genes_liste = tuple(genes_liste)
+    
+    # correlation matrix will be performed whenever more than 3 genes are select
+    # if there only two genes draw a scatter plot
     if len(genes_liste) >= 3:
-        correlation_matrix_analysis(genes_queried, genes_liste, col2)
+        correlation_matrix_analysis(df_original, genes_liste, col2)
         
     elif len(genes_liste) == 2:
-        scatter_comparison(genes_queried, genes_liste, col2)
+        scatter_comparison(df_original, genes_liste, col2)
     
     
-def cell_line_specific_printing(genes_queried,metadata_table, col1):
+def get_counts_tables(con, genes_liste)-> pd.DataFrame:
+    """_summary_
+
+    Args:
+        con (_type_): _description_
+        genes (_type_): _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """ 
+    df_original = con.execute(f"Select * from all_counts WHERE gene_name IN {tuple(genes_liste)}").fetchdf().set_index("gene_name")
+    df_curves = df_original.apply(zscore, axis = 1).reset_index()
+    df_curves = pd.melt(df_curves, id_vars = "gene_name") # melt the table
+    df_curves.columns = ["Gene Name","samples","z-scored variance stabilized counts"]
+    return df_curves, df_original
+
+
+def get_tpm_tables(con, genes) -> pd.DataFrame:
+    """_summary_
+
+    Args:
+        con (_type_): _description_
+        genes (_type_): _description_
+
+    Returns:
+        pd.DataFrame: _description_
+    """
+    columns_tpm = ["DAY00_1","DAY00_2","DAY00_3",
+               "DAY05_1","DAY05_2","DAY05_3",
+               "DAY09_1","DAY09_2","DAY09_3",
+               "DAY16_1","DAY16_2","DAY16_3",
+               "DAY26_1","DAY26_2","DAY26_3",
+               "DAY36_1","DAY36_2","DAY36_3"]
+    
+    tpm_curves = con.execute(f"SELECT * from tpm_counts WHERE gene_name IN {genes}").fetchdf().set_index("gene_name")
+    tpm_curves.columns = columns_tpm
+    tpm_curves = pd.melt(tpm_curves.reset_index(),id_vars = "gene_name")
+    tpm_curves.columns = ["Gene Name","Timepoint","TPM (Transcript per Million)"]
+    return tpm_curves
+    
+def cell_line_specific_printing(df_curves,metadata_table, col1):
     """ Print the trajectoreis for the selected genes for the cell line specifically
     Args: 
         genes_queried: list -> selected genes
         metadata_table: pd.DataFrame --> table that hold the sample and timepoint information
         col1: st.tabs.col --> tab and column where this figure should be drawn
     """
-    columns = [3* [i] for i in ["Day00", "Day05", "Day09", "Day16", "Day26", "Day36"]] *3
-    columns = [t for i in columns for t in i]
     
-    metadata_table["Timepoint"] = columns
-    gene_cell_line = genes_queried.copy().reset_index()
-    melted_queried = pd.melt(gene_cell_line, id_vars="gene_name")
-    melted_queried = pd.merge(melted_queried, metadata_table, left_on = "variable", right_on = "samples",how = "left")
-    cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
-    selected_table = melted_queried[melted_queried["cell_line"] == cell_select]
-    fig = draw_altair_graph(selected_table, "value", "gene_name")
+    cell_select = st.sidebar.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
+    selected_table = df_curves[df_curves["cell_line"] == cell_select]
+    
+    if len(selected_table["Gene Name"].unique()) <= 5:
+        fig = draw_altair_graph(selected_table, "z-scored variance stabilized counts", "Gene Name", "Time aggregated")
+    else: 
+        fig = make_heatmap(selected_table, "Gene Name", "z-scored variance stabilized counts", "Timepoint","Cell-Type specific Signatures")
+        
     col1.altair_chart(fig, use_container_width = True)
     
   
@@ -171,14 +209,35 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
         
     """
     
-    genes_queried = genes_queried.T.corr()
-    mask = np.triu(np.ones_like(genes_queried, dtype=bool))
-    fig = px.imshow(genes_queried, 
-                    color_continuous_scale='Viridis',
-                    text_auto=True,
-                    aspect="auto",
-                    title="Correlation Matrix between queried Genes")
-    col2.plotly_chart(fig, use_container_width = True)
+    #genes_queried = genes_queried.T.corr().reset_index().melt('gene_name')
+    #genes_queried.columns = ['var1', 'var2', 'correlation']
+    #print(genes_queried)
+    
+    
+    corrMatrix = genes_queried.T.corr().stack()
+    corrMatrix.index.names = ["var1","var2"]
+    corrMatrix = corrMatrix.reset_index()
+    corrMatrix.columns = ['var1', 'var2', 'correlation']
+    corrMatrix = corrMatrix.dropna()
+    chart = alt.Chart(corrMatrix).mark_rect().encode(
+    x=alt.X('var1', title=None),
+    y=alt.Y('var2', title=None),
+    color=alt.Color('correlation', legend=None),
+                    ).properties(
+                        width=alt.Step(40),
+                        height=alt.Step(40),
+                        title = "Correlation Matrix"
+                    )
+
+    chart += chart.mark_text(size=12).encode(
+        text=alt.Text('correlation', format=".2f"),
+        color=alt.condition(
+            "datum.correlation > 0.5",
+            alt.value('white'),
+            alt.value('black')
+        )
+    )
+    col2.altair_chart(chart, use_container_width = True)
                        
 def draw_information_layout():
     st.sidebar.subheader("InfoBox")
@@ -189,10 +248,12 @@ def make_trajectories(df_curves, tpm_curves = None, tab = None):
     """ this function is to draw the gene and miRNA trajectories """
     
     col1, col2 = tab.columns(2)
+    
     if tpm_curves is not None:
         #draw lineplots for the data with standard errors
             #vsd_fig = px.box(df_curves,x = "variable", y = "value", color = "Unnamed: 0")
-        vsd_figure = draw_altair_graph(df_curves, "z-scored variance stabilized counts", "Gene Name")
+        tpm_curves["Timepoint"] = [i.split("_")[0] for i in tpm_curves["Timepoint"]]
+        vsd_figure = draw_altair_graph(df_curves, "z-scored variance stabilized counts", "Gene Name", "Time aggregated")
         tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
         # write the figure into the ap
         col1.empty()
@@ -201,8 +262,9 @@ def make_trajectories(df_curves, tpm_curves = None, tab = None):
 
     else:
         st.markdown("---")
-        vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name")
+        vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name", "Time aggregated")
         col1.altair_chart(vsd_figure, use_container_width = True)
+        col2.warning("No Data found for TPM here!")
 
 def mirna_multimap_drawing(searched_mirna, con,tab):
     """ Make drawings for the miRNA multimappers
@@ -282,7 +344,7 @@ def nc_multimap_drawing(nc_queried: list, con: duckdb,tab):
     col2.write("ncRNA Differential Gene Expression Information:")
     col2.dataframe(nc_sig, use_container_width = True)
     
-def draw_altair_graph(data_draw, value, gene_annotation = None):
+def draw_altair_graph(data_draw, value, gene_annotation = None, timepoint = "Timepoint"):
     """ Draws the trajectories as altair graph
     Args:
         data_draw: pd.DataFrame -> preselected data of genes
@@ -293,7 +355,7 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
     chart = (
                 alt.Chart(data_draw)
                 .mark_boxplot(size = 30)
-                .encode(x=alt.X("Timepoint"),
+                .encode(x=alt.X(timepoint),
                         y=alt.Y(value, scale=alt.Scale(domain=[data_draw[value].min()-1, data_draw[value].max()+1])),
                         color=gene_annotation,
                         opacity=alt.condition(selection, alt.value(1), alt.value(0.2)))
@@ -305,7 +367,7 @@ def draw_altair_graph(data_draw, value, gene_annotation = None):
     chart_line = (
             alt.Chart(data_draw)
             .mark_line(interpolate = "natural")
-            .encode(x=alt.X("Timepoint",
+            .encode(x=alt.X(timepoint,
                             scale=alt.Scale(padding=1)),
                             y=alt.Y(f"mean({value})",scale=alt.Scale(domain=[data_draw[value].min()-1, data_draw[value].max()+1])),
                             color=gene_annotation,
@@ -340,11 +402,40 @@ def lnc_query_genes(genes_liste, con, tab):
     fig = draw_altair_graph(melted_selected_lncs, "vsd counts", "gene_name" )
     tab.write("---")
     tab.write(fig)
+    
+    
+def make_heatmap(df_curves,  gene_name, value, timepoint, title = None):
+    """_summary_
 
+    Args:
+        df_curves (pd.DataFrame): Variance stabilized counts of mRNAs
+        tab (st.tabs): Streamlit Tab to draw in
+
+    Returns:
+        _type_: _description_
+    """
+    chart = alt.Chart(df_curves).mark_rect().encode(
+                                                    alt.X(timepoint),
+                                                    alt.Y(gene_name),
+                                                    alt.Color(value, scale=alt.Scale(scheme='greenblue'))
+                                                    ).properties(
+                                                                title=title)
+
+    
+    return chart
 
 @st.experimental_singleton
 def execute_fill_list(_con):
-    draw = [i for i in sorted(_con.execute("SELECT gene_name from vsd_counts").fetchnumpy()["gene_name"]) if "." not in i]
+    """_summary_: This function should retrieve the list for the multiselect box
+    This should be hold in cache since these list will not change
+
+    Args:
+        _con (DuckDB): Database connection to duckdb
+
+    Returns:
+        tuple(list): A tuple holding the lists (names) for the different ncRNA species 
+    """
+    draw = [i for i in sorted(_con.execute("SELECT gene_name from all_counts").fetchnumpy()["gene_name"]) if "5" not in i]
     mirna = _con.execute("SELECT gene_name from fivep_counts").fetchnumpy()["gene_name"].tolist() + _con.execute("SELECT gene_name from threep_counts").fetchnumpy()["gene_name"].tolist()
     nc = _con.execute("SELECT gene_name from ncrna_counts").fetchnumpy()["gene_name"].tolist()
     lnc = _con.execute("Select external_gene_name from lnc_counts").fetchdf()

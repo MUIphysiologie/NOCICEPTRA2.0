@@ -1,4 +1,5 @@
-import streamlit as st 
+import contextlib
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import http
@@ -172,7 +173,7 @@ def make_chart(genes, con, disease_mirna = None,  mirna = None, statistics = Non
     col_enr2.table(statistics)
 
     if enrichment_diagram.shape[0] > 0:
-        ccol_enr2.markdown(r""" **Table 2**: G:Profiler enrichments""")
+        col_enr2.markdown(r""" **Table 2**: G:Profiler enrichments""")
         col_enr2.table(enrichment_diagram.set_index("description"))
 
     else:
@@ -305,34 +306,26 @@ def enrichments_genes(genes, species):
     )
     #st.write(r.raise_for_status())
     if r.status_code == 200: # check if connections worked
-        try: # catch errors if 404
+        with contextlib.suppress(KeyError):
             data = r.json()["result"]
             parents_list = []
             go_list = []
-            p_value = []
-            desc_value = []
-            source_list = []
-
             # Check for the best per parent pathways the most specialized pathways with the most detailed description
             for n in data:
-                go_list.append(n["native"]) 
-                for t in n["parents"]:
-                    parents_list.append(t)
+                go_list.append(n["native"])
+                parents_list.extend(iter(n["parents"]))
             end_list = [i for i in go_list if i not in parents_list]
 
-            for m in data:
-                # cehck for the 
-                if m["native"] in end_list:
-                    p_value.append(m["p_value"])
-            for l in data:
-                if l["native"] in end_list:
-                    desc_value.append(l["name"])
-            for l in data:
-                if l["native"] in end_list:
-                    source_list.append(l["source"])
-
+            p_value = [m["p_value"] for m in data if m["native"] in end_list]
+            desc_value = [l["name"] for l in data if l["native"] in end_list]
+            source_list = [l["source"] for l in data if l["native"] in end_list]
             # update the dictionary
-            go_profiler.update({"p-value": p_value, "go-terms":end_list, "description":desc_value, "source": source_list})
+            go_profiler |= {
+                "p-value": p_value,
+                "go-terms": end_list,
+                "description": desc_value,
+                "source": source_list,
+            }
 
             df_go = pd.DataFrame(columns = ["go-terms","description","source","p-value"])
             df_go["go-terms"] = list(end_list)
@@ -347,8 +340,6 @@ def enrichments_genes(genes, species):
             df_go = df_go.drop(["go-terms"], axis = 1)
             df_go_end = df_go_end.append(df_go)
 
-        except KeyError as e:
-            pass
     else:
         print("enrichment is not working currently")
 
