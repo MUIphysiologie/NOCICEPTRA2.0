@@ -207,12 +207,6 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
         genes_queried: list -> list of selected genes
         
     """
-    
-    #genes_queried = genes_queried.T.corr().reset_index().melt('gene_name')
-    #genes_queried.columns = ['var1', 'var2', 'correlation']
-    #print(genes_queried)
-    
-    
     corrMatrix = genes_queried.T.corr().stack()
     corrMatrix.index.names = ["var1","var2"]
     corrMatrix = corrMatrix.reset_index()
@@ -239,6 +233,8 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
     col2.altair_chart(chart, use_container_width = True)
                        
 def draw_information_layout():
+    """_summary_ Should draw the Info Box
+    """
     st.sidebar.subheader("InfoBox")
     st.sidebar.info("Please Search for your gene/miRNA or ncRNA of interest by using the multiSelect panel shown in each Tab. The Panels will be automatically updated!")
 
@@ -247,23 +243,27 @@ def make_trajectories(df_curves, tpm_curves = None, tab = None):
     """ this function is to draw the gene and miRNA trajectories """
     
     col1, col2 = tab.columns(2)
-    
+
     if tpm_curves is not None:
         #draw lineplots for the data with standard errors
             #vsd_fig = px.box(df_curves,x = "variable", y = "value", color = "Unnamed: 0")
-        tpm_curves["Timepoint"] = [i.split("_")[0] for i in tpm_curves["Timepoint"]]
-        vsd_figure = draw_altair_graph(df_curves, "z-scored variance stabilized counts", "Gene Name", "Time aggregated")
-        tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
-        # write the figure into the ap
-        col1.empty()
-        col1.altair_chart(vsd_figure,use_container_width = True)
-        col2.altair_chart(tpm_figure,use_container_width= True)
-
+        draw_trajectories(tpm_curves, df_curves, col1, col2)
     else:
         st.markdown("---")
         vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name", "Time aggregated")
         col1.altair_chart(vsd_figure, use_container_width = True)
         col2.warning("No Data found for TPM here!")
+
+
+# TODO Rename this here and in `make_trajectories`
+def draw_trajectories(tpm_curves, df_curves, col1, col2):
+    tpm_curves["Timepoint"] = [i.split("_")[0] for i in tpm_curves["Timepoint"]]
+    vsd_figure = draw_altair_graph(df_curves, "z-scored variance stabilized counts", "Gene Name", "Time aggregated")
+    tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
+    # write the figure into the ap
+    col1.empty()
+    col1.altair_chart(vsd_figure,use_container_width = True)
+    col2.altair_chart(tpm_figure,use_container_width= True)
 
 def mirna_multimap_drawing(searched_mirna, con,tab):
     """ Make drawings for the miRNA multimappers
