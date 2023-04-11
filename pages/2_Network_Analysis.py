@@ -13,7 +13,7 @@ import duckdb
 
 hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
 
-@st.experimental_singleton
+@st.cache_resource
 def load_data():
     """
     Defines the database connection to the NOCICEPTRA duckdb database
@@ -27,7 +27,7 @@ def load_data():
 
 def kegg_disease_analysis():
     con = load_data()
-    tab1, tab2, tab3 = st.tabs(["KEGG Network","Disease Network", "miRNA Networks (BETA)"]) 
+    tab1, tab2, tab3 = st.tabs(["KEGG Network","Disease Network", "miRNA Networks (BETA)"])
     selected_kegg, disease_selection, selected_mirnas = execute_fill_list_pathways(con)
     kegg_decision = tab1.selectbox("Please select your KEGG pathway:",selected_kegg)
     kegg_id = con.execute(f"Select gene_name, ID from kegg_pathway WHERE gene_name='{kegg_decision}'").fetchdf()["ID"].tolist()[0]
@@ -41,7 +41,7 @@ def kegg_disease_analysis():
 
     st.sidebar.info("Please select you KEGG/Disease pathway or the miRNA of interest to derive enriched genes throughout iPSC-derived sensory neuron development")
 
-    make_chart(resulting_gene_list, 
+    make_chart(resulting_gene_list,
                con,
                statistics = statistics,
                p_value = p_value,
@@ -53,18 +53,18 @@ def kegg_disease_analysis():
     diesase_selected = tab2.selectbox("Please select the Disease of Interest:", disease_selection)
     show_labels = tab2.checkbox("Show labels in rich plots", value = True)
     run_disease_analysis(con, diesase_selected, show_labels,super_cluster_statistics,super_cluster_counts, tab2)
-    
-    
+
+
     #
     mirna = tab3.selectbox("Choose your miRNA:", selected_mirnas)
     target_score = tab3.slider("Target-Score Treshold (considers only values above the threshold)", min_value = 0, max_value = 200, step = 1, value = 75)
-    
+
     if tab3.button("Start miNRA analysis:"):
         get_mirna_information(mirna, con,target_score, tab3)
 
 
 def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statistics, super_cluster_counts, tab):
-    
+
     if tab.button("Start Analysis:"):
         disease_genes = con.execute(f"Select geneSymbol from diseases WHERE diseaseName='{diesase_selected}'").fetchnumpy()["geneSymbol"].tolist()
         #disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
@@ -76,14 +76,14 @@ def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statis
                 tab = tab,
                 checkbox = show_labels,
                 threshold = 0.95
-                ) 
+                )
 
 
 
 def get_kegg(kegg_pathway):
-    """ REST API: 
+    """ REST API:
     query a kegg pathway to obtain all the genes in the pathway
-    kegg_pathway -> ID of the pathway 
+    kegg_pathway -> ID of the pathway
     """
     #get the patway
     pathway = kegg_pathway
@@ -157,20 +157,20 @@ def make_chart(genes, con, disease_mirna = None,  mirna = None, statistics = Non
                     ,"neural progenitor 1": "purple", "neuroal progenitor late" : "rose","nociceptor":"red"}
     node["color"] = [color_liste.get(i) for i in node["supercluster_gene"]]
     node = node[node["gene_name"].isin(links["source"].tolist() + links["target"].tolist())]
-    nodes = hv.Dataset(pd.DataFrame(node.sort_values("supercluster_gene")),"index")  
+    nodes = hv.Dataset(pd.DataFrame(node.sort_values("supercluster_gene")),"index")
 
     links_index = get_indeces_hv(links, nodes)
     col_enr1, col_enr2 = tab.columns(2)
     # here single miRNA interactions are determined
-    
+
     chord_diagram = chart_plot(nodes, links_index, checkbox = checkbox)
     enrichment_diagram = enrichments_genes(nodes.data["gene_name"].tolist(),"hsapiens")
-    
+
     col_enr1.bokeh_chart(hv.render(chord_diagram, backend = "bokeh"), use_container_width = True)
     draw_table_info(p_value,col_enr2)
-    
+
     col_enr2.markdown(r""" **Table 1**:  Standardized Pearson residuals""")
-    col_enr2.table(statistics)
+    col_enr2.dataframe(statistics, use_container_width = True)
 
     if enrichment_diagram.shape[0] > 0:
         col_enr2.markdown(r""" **Table 2**: G:Profiler enrichments""")
@@ -178,7 +178,7 @@ def make_chart(genes, con, disease_mirna = None,  mirna = None, statistics = Non
 
     else:
         tab.warning("No enrichments found check your internet connection")
-        
+
 def get_node_table_hv(con, links, genes):
     """
     """
@@ -187,7 +187,7 @@ def get_node_table_hv(con, links, genes):
     mirna_genes = mirna_genes.groupby(["gene_name","supercluster_gene"])["score"].agg("sum").reset_index()
     node = mirna_genes[mirna_genes["gene_name"].isin(links["preferred_name_x"])]
     node = node[node["gene_name"].isin(links["preferred_name_y"])]
-    
+
     return node
 
 def get_indeces_hv(links, nodes):
@@ -209,18 +209,18 @@ def get_indeces_hv(links, nodes):
 
 def draw_table_info(p_value, colum_sel):
     """
-    Should draw the appropriate Table Information choosen by the p-value detected 
-    
+    Should draw the appropriate Table Information choosen by the p-value detected
+
     input:
         p_value: float <- the tested p-value for the network enrichemt
         column_sel <- st.column <- column where the information should be drawn with
     """
     if p_value < 0.05:
-        colum_sel.markdown(r''' **Figure 1:** Chord-plot of custom Gene interaction, colors define the  differentiation stages. 
-        Size of the Gene dots is defined by the cummulative miRNA target-score and edges weight are defined by the StringDB database confidence score. 
+        colum_sel.markdown(r''' **Figure 1:** Chord-plot of custom Gene interaction, colors define the  differentiation stages.
+        Size of the Gene dots is defined by the cummulative miRNA target-score and edges weight are defined by the StringDB database confidence score.
         The $chi-squared$ p-value of $\textbf{%f}$, indicates an significant enrichment of genes''' %(p_value), unsafe_allow_html=True)
     else:
-        colum_sel.markdown(r''' **Figure 1** Chord-plot of custom Gene interaction, colors define the  differentiation stages. 
+        colum_sel.markdown(r''' **Figure 1** Chord-plot of custom Gene interaction, colors define the  differentiation stages.
         Size of the Gene dots is defined by the cummulative miRNA target-score and edges weight are defined by the StringDB database confidence score. <br>
         The $chi-squared$ p-value of $\textbf{%f}$, indicates no significance''' %(p_value), unsafe_allow_html=True)
 
@@ -228,11 +228,11 @@ def get_interaction(genes,con, threshold = 0.4):
 
     """ use the string DB database
 
-    - frozen set 
+    - frozen set
     - remove duplicates that are just exchanges
     - prefered_name_x --> source
-    - preferred_name_y --> target 
-    - genes -> input 
+    - preferred_name_y --> target
+    - genes -> input
     """
     genes = tuple(genes)
     return con.execute(
@@ -280,7 +280,7 @@ def chart_plot(node, index, mirna = None, checkbox = True):
 
 def set_toolbar_autohide(plot, element):
     bokeh_plot = plot.state
-    bokeh_plot.toolbar.autohide = True    
+    bokeh_plot.toolbar.autohide = True
 
 def enrichments_genes(genes, species):
 
@@ -290,7 +290,7 @@ def enrichments_genes(genes, species):
     """
     import json
     go_profiler = {}
-    df_go_end = pd.DataFrame()  # select a table to append 
+    df_go_end = pd.DataFrame()  # select a table to append
     genes = genes #reference to the list of genes
 
     # request the gprofiler website
@@ -347,7 +347,7 @@ def enrichments_genes(genes, species):
 
 def get_mirna_information(mirna, con, target_score, tab):
 
-    """ 
+    """
     positive --> above positive correlation (default = false, means below the queried correlation)
     mirna --> queried miRNA
     mirna_genes --> all miRNAs miRNA_edges Database
@@ -368,7 +368,7 @@ def get_mirna_information(mirna, con, target_score, tab):
 
     #check how lenghty the genes list
     if len(mirna_target_genes) > 10:
-        
+
         make_chart(mirna_target_genes,con,
                    disease_mirna = None,
                    mirna = True,
@@ -379,15 +379,15 @@ def get_mirna_information(mirna, con, target_score, tab):
     else:
         #else the number of targets is to loo
         tab.warning("Try different settings or a different miRNA, the number of miRNA targets is to low")
-    
+
 def mirna_enrichments_statistics(mirna_targets, mirna):
-    """ Function to detect gene_enrichments of miRNA targetign 
-    
-    mirna_targets -> mirna_prediction,correlation,validation table 
+    """ Function to detect gene_enrichments of miRNA targetign
+
+    mirna_targets -> mirna_prediction,correlation,validation table
     mirna -> queried mirna
-    
+
     returns: enrichment for the 7 different stages as table, float(p_value) """
-    
+
 
     #detect the number of genes belonging to each cluster, remove duplicates
     genes_diagram = mirna_targets[["gene_name","supercluster_gene"]]
@@ -414,6 +414,12 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
     return enrichments_residuals, p_value
 
 def hook(plot, example):
+    """_summary_
+
+    Args:
+        plot (_type_): _description_
+        example (_type_): _description_
+    """
     print("function is working")
     print('plot.state:   ', plot.state)
     print('plot.handles: ', sorted(plot.handles.keys()))
@@ -421,13 +427,21 @@ def hook(plot, example):
     plot.handles["plot"].border_fill_alpha= 0
     plot.handles["text_1_glyph"].text_color = "grey"
 
-@st.experimental_singleton
+@st.cache_resource
 def execute_fill_list_pathways(_con):
+    """_summary_: Loads the selectooxes with the appropiate data
+
+    Args:
+        _con (DuckDBConnection): _description_
+
+    Returns:
+        _type_: _description_
+    """
     print("loaded the data")
     kegg = _con.execute("Select gene_name from kegg_pathway").fetchnumpy()["gene_name"].tolist()
     disease = _con.execute("Select diseaseName from diseases").fetchdf()["diseaseName"].unique()
     mirna = _con.execute("Select mirna from chord_diagram").fetchdf()["mirna"].unique()
-    return (kegg,disease, mirna) 
+    return (kegg,disease, mirna)
 
 if __name__ == "__main__":
     kegg_disease_analysis()
