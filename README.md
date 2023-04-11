@@ -16,4 +16,6 @@ In addition also further updates were made on the underlying data structure.
 </ul>
 
 This app will also be made available at the streamlit cloud server under nociceptra.streamlitapps.io
+
+All the analysis and streamlit dashboar development was performed by Maximilian Zeidler PhD
   
