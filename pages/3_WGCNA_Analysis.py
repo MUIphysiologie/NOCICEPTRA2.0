@@ -91,7 +91,7 @@ def experimental_description(con):
     tab1.write("Enrichment Analysis:")
     tab1.dataframe(mod_gene_enr.set_index("description")[["p-value","source"]].iloc[:10,:], use_container_width=True)
 
-
+    # this should still go into a separate function
     #miRNA trajectories for each module
     modules_mirna = con.execute("Select cluster from sup_mirna").fetchdf()["cluster"].unique()
     tab2.write("Select your Module of Interest:")
@@ -112,7 +112,8 @@ def experimental_description(con):
 
     # write the figurse
     mirna_1.altair_chart(mirna_fig, use_container_width = True)
-    mirna_2.write(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:])
+    mirna_2.dataframe(mod_mirna_enr.set_index("Pathway")[["p_value","Term"]].iloc[:10,:],
+                      use_container_width=True)
 
 
     # put the dataframe into the expander and style it like a heatmap
