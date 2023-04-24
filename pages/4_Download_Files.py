@@ -12,7 +12,7 @@ def download_files(database):
         None
     """
     st.header("Download the NOCICEPTRA database")
-    tables = database.execute("SHOW TABLES").fetchdf()
+    st.download_button("Download DuckDB Database: ", )
 
 
 @st.cache_resource

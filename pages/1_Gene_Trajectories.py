@@ -28,6 +28,7 @@ def trajectory_start():
 
     """
     con = load_data()
+    st.header("Expression Signatures of iPSC-derived sensory Neuron (iDNs)")
     tab1, tab2, tab3, tab4 = st.tabs(["mRNA and miRNA Trajectories",
                                       "miRNA with Multimapper",
                                       "ncRNA Trajectories (Excerpt)",
@@ -35,6 +36,7 @@ def trajectory_start():
 
     selected_draw, mirna_select,nc_select, lnc_select = execute_fill_list(con)
 
+    tab1.write("---")
     #retrieve the genes for selection for searching
     gene_queried = tab1.multiselect("Select Gene:", selected_draw)
     tab1.write("---")
@@ -182,7 +184,10 @@ def scatter_comparison(genes_queried: list, genes_liste:list, col2):
         genes_list: list
         cols2: st.tabs.cols
     """
+    genes_queried = genes_queried.groupby(level=0)
+    genes_queried = genes_queried.last()
     genes_queried = genes_queried.T
+
     # retrieve the max and minimum values
     max = genes_queried.to_numpy().max()
     min = genes_queried.to_numpy().min()
@@ -455,7 +460,17 @@ def execute_fill_list(_con):
     Returns:
         tuple(list): A tuple holding the lists (names) for the different ncRNA species
     """
-    draw = [i for i in sorted(_con.execute("SELECT gene_name from all_counts").fetchnumpy()["gene_name"]) if "5" not in i]
+    draw = sorted(list(
+        {
+            i
+            for i in sorted(
+                _con.execute("SELECT gene_name from all_counts").fetchnumpy()[
+                    "gene_name"
+                ]
+            )
+            if "5" not in i
+        }
+    ))
     mirna = _con.execute("SELECT gene_name from fivep_counts").fetchnumpy()["gene_name"].tolist() + _con.execute("SELECT gene_name from threep_counts").fetchnumpy()["gene_name"].tolist()
     nc = _con.execute("SELECT gene_name from ncrna_counts").fetchnumpy()["gene_name"].tolist()
     lnc = _con.execute("Select external_gene_name from lnc_counts").fetchdf()
