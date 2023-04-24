@@ -207,7 +207,7 @@ def get_indeces_hv(links, nodes):
 
     return links_index
 
-def draw_table_info(p_value, colum_sel):
+def draw_table_info(p_value: float, colum_sel: str):
     """
     Should draw the appropriate Table Information choosen by the p-value detected
 
@@ -224,7 +224,7 @@ def draw_table_info(p_value, colum_sel):
         Size of the Gene dots is defined by the cummulative miRNA target-score and edges weight are defined by the StringDB database confidence score. <br>
         The $chi-squared$ p-value of $\textbf{%f}$, indicates no significance''' %(p_value), unsafe_allow_html=True)
 
-def get_interaction(genes,con, threshold = 0.4):
+def get_interaction(genes: pd.DataFrame,con, threshold:float = 0.4):
 
     """ use the string DB database
 
@@ -239,7 +239,7 @@ def get_interaction(genes,con, threshold = 0.4):
         f'Select * from string_interaction_high WHERE preferred_name_x IN {genes} AND preferred_name_y IN {genes} AND score>{threshold};'
     ).fetchdf()
 
-def chart_plot(node, index, mirna = None, checkbox = True):
+def chart_plot(node: pd.DataFrame, index: list, mirna: bool = None, checkbox: bool = True):
 
     """ two different networks
     mirna -> if miRNA is queried or not
@@ -282,7 +282,7 @@ def set_toolbar_autohide(plot, element):
     bokeh_plot = plot.state
     bokeh_plot.toolbar.autohide = True
 
-def enrichments_genes(genes, species):
+def enrichments_genes(genes: list, species: str) -> pd.DataFrame:
 
     """ use the G:Profiler enrichment analysis REST-api
     genes -> queried genes
@@ -414,7 +414,7 @@ def mirna_enrichments_statistics(mirna_targets, mirna):
     return enrichments_residuals, p_value
 
 def hook(plot, example):
-    """_summary_
+    """_summary_: This should handle the plot background
 
     Args:
         plot (_type_): _description_
@@ -437,7 +437,6 @@ def execute_fill_list_pathways(_con):
     Returns:
         _type_: _description_
     """
-    print("loaded the data")
     kegg = _con.execute("Select gene_name from kegg_pathway").fetchnumpy()["gene_name"].tolist()
     disease = _con.execute("Select diseaseName from diseases").fetchdf()["diseaseName"].unique()
     mirna = _con.execute("Select mirna from chord_diagram").fetchdf()["mirna"].unique()
