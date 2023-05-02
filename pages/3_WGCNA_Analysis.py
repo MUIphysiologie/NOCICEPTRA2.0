@@ -246,7 +246,6 @@ def draw_interactive_network(gene_network):
             )
         )
 
-
     return fig
 
 
