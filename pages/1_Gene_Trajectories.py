@@ -36,17 +36,17 @@ def trajectory_start():
 
     selected_draw, mirna_select,nc_select, lnc_select = execute_fill_list(con)
     #retrieve the genes for selection for searching
-    gene_queried = tab1.multiselect("Select Gene for Temporal Analysis:", selected_draw)
+    gene_queried = tab1.multiselect("Select Genes for Temporal Analysis:", selected_draw)
     tab1.write("---")
 
     #retrieve the mirnas for selection for searching
     mirna_select = sorted(list(set(mirna_select)))
-    mirna_queried = tab2.multiselect("Select miRNA for temporal Analysis: ", mirna_select)
+    mirna_queried = tab2.multiselect("Select miRNAs for temporal Analysis: ", mirna_select)
     tab2.write("---")
     #ncRNA
-    nc_queried = tab3.multiselect("Select ncRNA for temporal Analysis: ", nc_select)
+    nc_queried = tab3.multiselect("Select ncRNAs for temporal Analysis: ", nc_select)
     tab3.write("---")
-    lnc_queried = tab4.multiselect("Select lncRNA for temporal Analysis: ", lnc_select["external_gene_name"].tolist())
+    lnc_queried = tab4.multiselect("Select lncRNAs for temporal Analysis: ", lnc_select["external_gene_name"].tolist())
 
     # here the layout of the sidebar should be added
 
