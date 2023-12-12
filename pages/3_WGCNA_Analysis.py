@@ -81,7 +81,7 @@ def experimental_description(con):
     #check if user wants to search for hub-genes
 
     # draw the plot and the network
-    fig1 = plot_writing(sup_mrna_mod,"miRNA Module Trajectory") # put the axis within the context
+    fig1 = plot_writing(sup_mrna_mod,"mRNA Module Trajectory") # put the axis within the context
     interactive_figure = draw_network(con, module_sel)
 
     # correctly order it into the app
@@ -118,6 +118,7 @@ def experimental_description(con):
 
     # put the dataframe into the expander and style it like a heatmap
     tab2.write("-------")
+    tab2.write("To retrieve more information about the expression you can expand the DataFrame below")
     heatmap_exp =  tab2.expander("Show miRNA DataFrame:")
     heatmap_exp.write("------")
     heatmap_exp.header("miRNA DataFrame")
