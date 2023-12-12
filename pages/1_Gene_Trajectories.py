@@ -46,7 +46,7 @@ def trajectory_start():
     nc_queried = tab3.multiselect("Select ncRNAs for temporal Analysis: ", nc_select)
     tab3.write("---")
     lnc_queried = tab4.multiselect("Select lncRNAs for temporal Analysis: ", lnc_select["external_gene_name"].tolist())
-    tab3.write("---")
+    tab4.write("---")
 
     # here the layout of the sidebar should be added
     if gene_queried:
