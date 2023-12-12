@@ -166,7 +166,8 @@ def cell_line_specific_printing(df_curves,metadata_table, col1):
         col1: st.tabs.col --> tab and column where this figure should be drawn
     """
 
-    cell_select = st.sidebar.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
+    col1.markdown("Here you can explore cell line specific trajectories for the selected gene:")
+    cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
     selected_table = df_curves[df_curves["cell_line"] == cell_select]
 
     if len(selected_table["Gene Name"].unique()) <= 5:
