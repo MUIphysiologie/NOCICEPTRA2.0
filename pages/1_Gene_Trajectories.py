@@ -175,7 +175,6 @@ def cell_line_specific_printing(df_curves,metadata_table, col1):
     else:
         fig = make_heatmap(selected_table, "Gene Name", "z-scored variance stabilized counts", "Timepoint","Cell-Type specific Signatures")
     col1.altair_chart(fig, use_container_width = True)
-    st.sidebar.markdown("---")
 
 def scatter_comparison(genes_queried: list, genes_liste:list, col2):
     # sourcery skip: avoid-builtin-shadow
