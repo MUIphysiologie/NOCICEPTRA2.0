@@ -104,7 +104,7 @@ def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statis
                 p_value = dis_pval,
                 tab = tab,
                 checkbox = show_labels,
-                threshold = 0.95
+                threshold = 0.99
                 )
 
 
