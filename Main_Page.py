@@ -13,8 +13,7 @@ def main():
     """
 
     #set the logo
-    st.sidebar.info("""Welcome to NOCICEPTRA a resource that enables
-                    you to understand Expression signatures of developmental sensory neurons""")
+    st.sidebar.info("""Welcome to NOCICEPTRA a resource about expression signatures of developmental sensory neurons""")
     start_page()
 
 
