@@ -216,8 +216,6 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
     y=alt.Y('var2', title=None),
     color=alt.Color('correlation', legend=None),
                     ).properties(
-                        width=alt.Step(100),
-                        height=alt.Step(100),
                         title = "Correlation Matrix"
                     )
 
