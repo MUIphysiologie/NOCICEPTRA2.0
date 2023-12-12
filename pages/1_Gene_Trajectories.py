@@ -28,15 +28,13 @@ def trajectory_start():
 
     """
     con = load_data()
-    st.header("Expression Signatures of iPSC-derived sensory Neuron (iDNs)")
+    st.header("Expression Signatures of iPSC-derived sensory Neuron")
     tab1, tab2, tab3, tab4 = st.tabs(["mRNA and miRNA Trajectories",
                                       "miRNA with Multimapper",
                                       "ncRNA Trajectories (Excerpt)",
                                       "lncRNA Trajectories"])
 
     selected_draw, mirna_select,nc_select, lnc_select = execute_fill_list(con)
-
-    tab1.write("---")
     #retrieve the genes for selection for searching
     gene_queried = tab1.multiselect("Select Gene:", selected_draw)
     tab1.write("---")
