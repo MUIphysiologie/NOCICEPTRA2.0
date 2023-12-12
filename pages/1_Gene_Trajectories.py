@@ -86,13 +86,13 @@ def preprocess_tpm_vsd(genes_liste: list,con: duckdb, tab: st.tabs) -> None:
         if len(df_curves["Gene Name"].unique()) <= 5:
             make_trajectories(df_curves, tpm_curves, tab)
         else:
-            fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Gene Signatures")
+            fig = make_heatmap(df_curves, "Gene Name", "z-score", "Timepoint", title = "Temporal Signatures")
             tab.altair_chart(fig, use_container_width = True)
 
     elif len(df_curves["Gene Name"].unique()) <= 5:
         make_trajectories(df_curves, None, tab)
     else:
-        fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Gene Signatures")
+        fig = make_heatmap(df_curves, "Gene Name", "z-score", "Timepoint", title = "Temporal Signatures")
         tab.altair_chart(fig, use_container_width = True)
 
 
@@ -164,14 +164,14 @@ def cell_line_specific_printing(df_curves,metadata_table, col1):
         col1: st.tabs.col --> tab and column where this figure should be drawn
     """
 
-    col1.markdown("Here you can explore cell line specific trajectories for the selected gene:")
+    col1.markdown("Explore cell line specific trajectories:")
     cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
     selected_table = df_curves[df_curves["cell_line"] == cell_select]
 
     if len(selected_table["Gene Name"].unique()) <= 5:
         fig = draw_altair_graph(selected_table, "z-scored variance stabilized counts", "Gene Name", "Time aggregated")
     else:
-        fig = make_heatmap(selected_table, "Gene Name", "z-scored variance stabilized counts", "Timepoint","Cell-Type specific Signatures")
+        fig = make_heatmap(selected_table, "Gene Name", "z-score", "Timepoint","Cell-Type specific Signatures")
     col1.altair_chart(fig, use_container_width = True)
 
 def scatter_comparison(genes_queried: list, genes_liste:list, col2):
