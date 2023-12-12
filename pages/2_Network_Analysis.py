@@ -10,8 +10,27 @@ import holoviews as hv
 from holoviews import opts, dim
 import requests
 import duckdb
+import logging
+# Create a logger
+logger = logging.getLogger('my_logger')
 
+# Set the level of the logger. This can be DEBUG, INFO, WARNING, ERROR, or CRITICAL
+logger.setLevel(logging.DEBUG)
+
+# Create a stream handler for the logger
+stream_handler = logging.StreamHandler()
+
+# Create a formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Set the formatter for the stream handler
+stream_handler.setFormatter(formatter)
+
+# Add the stream handler to the logger
+logger.addHandler(stream_handler)
 hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
+
+
 
 @st.cache_resource
 def load_data():
@@ -73,7 +92,7 @@ def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statis
                                 (disease_selected,)
                             ).fetchnumpy()["geneSymbol"].tolist()
         except Exception as e:
-            print(e)
+            logger.error(e)
             tab.warning("Disease currently not found")
             return None
 
