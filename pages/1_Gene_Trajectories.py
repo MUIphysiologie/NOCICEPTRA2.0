@@ -203,6 +203,7 @@ def scatter_comparison(genes_queried: list, genes_liste:list, col2):
                                     orient='bottom').configure_axis(grid = False,
                                                                       labelFontSize = 13).configure_view(strokeOpacity = 0)
     #final_figure = fig + fig.transform_regression(str(genes_liste[0]),str(genes_liste[1])).mark_line()
+    col2.markdown("Correlation Analysis of the two selected genes")
     col2.altair_chart(final, use_container_width = True)
 
 
@@ -232,6 +233,7 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
             alt.value('black')
         )
     )
+    col2.markdown("Correlation Matrix of all selected genes:")
     col2.altair_chart(chart, use_container_width = True)
 
 def prepare_correlation_matrix(genes_queried: list):
@@ -273,6 +275,7 @@ def make_trajectories(df_curves: pd.DataFrame, tpm_curves: pd.DataFrame = None, 
     else:
         st.markdown("---")
         vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name", "Time aggregated")
+        col1.markdown("Temporal Trajectories of Variance Stabilized Counts")
         col1.altair_chart(vsd_figure, use_container_width = True)
         col2.warning("No Data found for TPM here!")
 
@@ -288,7 +291,9 @@ def draw_trajectories(tpm_curves: pd.DataFrame,
     tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
     # write the figure into the ap
     col1.empty()
+    col1.markdown("Temporal Trajectories of Variance Stabilized Counts")
     col1.altair_chart(vsd_figure,use_container_width = True)
+    col2.markdown("Temporal Trajectories of Transcripts per Millions")
     col2.altair_chart(tpm_figure,use_container_width= True)
 
 def mirna_multimap_drawing(searched_mirna, con,tab):
