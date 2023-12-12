@@ -168,8 +168,8 @@ def cell_line_specific_printing(df_curves,metadata_table, col1):
     "Select Cell-Line",
     ["AD2","AD3","840"],
     index=0,
+    horizontal = True
             )
-    cell_select = col1.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
     selected_table = df_curves[df_curves["cell_line"] == cell_select]
 
     if len(selected_table["Gene Name"].unique()) <= 5:
