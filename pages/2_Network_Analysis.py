@@ -89,7 +89,7 @@ def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statis
         try:
             disease_genes = con.execute(
                                 "SELECT geneSymbol FROM diseases WHERE diseaseName=?", 
-                                (disease_selected,)
+                                (diesase_selected,)
                             ).fetchnumpy()["geneSymbol"].tolist()
         except Exception as e:
             logger.error(e)
