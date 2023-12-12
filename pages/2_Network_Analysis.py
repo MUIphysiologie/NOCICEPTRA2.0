@@ -73,7 +73,9 @@ def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statis
                                 (disease_selected,)
                             ).fetchnumpy()["geneSymbol"].tolist()
         except Exception as e:
-            tab.markdown("Disease currently not found")
+            print(e)
+            tab.warning("Disease currently not found")
+            return None
 
         #disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
         disstats, dis_pval = gene_set_kegg_enrichment(disease_genes, super_cluster_statistics,
