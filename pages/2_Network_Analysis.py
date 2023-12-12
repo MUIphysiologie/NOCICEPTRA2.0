@@ -66,7 +66,15 @@ def kegg_disease_analysis():
 def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statistics, super_cluster_counts, tab):
 
     if tab.button("Start Analysis:"):
-        disease_genes = con.execute(f"Select geneSymbol from diseases WHERE diseaseName='{diesase_selected}'").fetchnumpy()["geneSymbol"].tolist()
+
+        try:
+            disease_genes = con.execute(
+                                "SELECT geneSymbol FROM diseases WHERE diseaseName=?", 
+                                (disease_selected,)
+                            ).fetchnumpy()["geneSymbol"].tolist()
+        except Exception as e:
+            tab.markdown("Disease currently not found")
+
         #disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
         disstats, dis_pval = gene_set_kegg_enrichment(disease_genes, super_cluster_statistics,
                                                 super_cluster_counts)
