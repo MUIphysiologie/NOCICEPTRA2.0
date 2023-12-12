@@ -26,7 +26,7 @@ def start_page():
     st.markdown("---")
     st.write(r"""***Articles:***""")
     st.markdown(r""" ***NOCICEPTRA2.0 - a comprehensive ncRNA atlas of human native and iPSC-derived sensory neurons***  <br>
-                Maximilian Zeidler, Diana Tavares-Ferreira, Jackson Brougher, Theodore J. Price and Michaela Kress (bioRxiv) """, unsafe_allow_html=True)
+                Maximilian Zeidler, Diana Tavares-Ferreira, Jackson Brougher, Theodore J. Price and Michaela Kress (iScience) """, unsafe_allow_html=True)
     st.markdown(r""" ***NOCICEPTRA: Gene and microRNA signatures and their trajectories characterizing human iPSC-derived nociceptor maturation.***  <br>
     Zeidler M, Kummer K, Schoepf C, Theodora Kalpachidou, Kern G, Cader Z, Kress M, Advanced Science (2021)""", unsafe_allow_html=True)
     st.markdown(r""" ***Selected Ionotropic Receptors and Voltage-Gated Ion Channels: More Functional Competence for Human Induced Pluripotent Stem Cell (iPSC)-Derived Nociceptors.***

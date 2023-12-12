@@ -2,15 +2,15 @@
 
 # Beta Version:
 
-Tool in Python that should visualize the Analysis of miRNAs, mRNAs, ncRNAs.
+Exploratory Tool that should visualize the Analysis of miRNAs, mRNAs and ncRNAs.
 <br>
 <img src="Images/Readme.png" alt="StartingPage">
 <br>
 
 ## Details:
-Data is provided using the DuckDB OLAP Database.
-Tool was updated to use interactive libraries instead of Matplotlib such as Altair and Plotly
-In addition also further updates were made on the underlying data structure. Now all data is stored in the duckdb database. Which can be downloaded here on github.
+Data ETL was performed using the DuckDB OLAP Database.
+The original tool was updated to use interactive libraries (e.g Plotly and Altair) instead of Matplotlib.
+In addition also further updates were made on the underlying data structure. Now all data is stored in a comman duckdb database which only allows for read operations. The database can be downloaded here on Github.
 
 
 <p> Tool can be started using the following command:
@@ -32,9 +32,9 @@ Currently there exist three different sections, including a Trajectory Analysis,
 
 </ul>
 
-The app is also available at nociceptra.streamlitapps.io, but might lack Memory if parallel access is saturating the memory.
+The app is also available at nociceptra.streamlitapps.io, but might lack Memory if parallel access is saturating the memory, since it is only using the Free Tier here.
 
-## Contributor to the Applicatin
+## Contributors
 
 Maximilian Zeidler PhD
 
