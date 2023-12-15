@@ -99,13 +99,18 @@ def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statis
         #disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
         disstats, dis_pval = gene_set_kegg_enrichment(disease_genes, super_cluster_statistics,
                                                 super_cluster_counts)
-        make_chart(disease_genes,con,
-                statistics = disstats,
-                p_value = dis_pval,
-                tab = tab,
-                checkbox = show_labels,
-                threshold = 0.99
-                )
+
+        try:
+            make_chart(disease_genes,con,
+                    statistics = disstats,
+                    p_value = dis_pval,
+                    tab = tab,
+                    checkbox = show_labels,
+                    threshold = 0.95
+                    )
+        except KeyError:
+            tab.warning("Not enough gene names found here with interaction score > 0.95 found!")
+            return None
 
 
 
