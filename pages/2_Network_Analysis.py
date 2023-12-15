@@ -60,12 +60,16 @@ def kegg_disease_analysis():
 
     st.sidebar.info("Please select you KEGG/Disease pathway or the miRNA of interest to derive enriched genes throughout iPSC-derived sensory neuron development")
 
-    make_chart(resulting_gene_list,
-               con,
-               statistics = statistics,
-               p_value = p_value,
-               tab = tab1
-               )
+    try:
+        make_chart(resulting_gene_list,
+                con,
+                statistics = statistics,
+                p_value = p_value,
+                tab = tab1
+                )
+    except KeyError:
+        tab1.warning("Not enough genes to construct target network")
+        return None
 
 
     # also evaluate the disease gene interaction
@@ -403,13 +407,17 @@ def get_mirna_information(mirna, con, target_score, tab):
     #check how lenghty the genes list
     if len(mirna_target_genes) > 10:
 
-        make_chart(mirna_target_genes,con,
-                   disease_mirna = None,
-                   mirna = True,
-                   statistics = statistics,
-                   p_value = float(p_value),
-                   mirna_name = mirna,
-                   tab = tab)
+        try:
+            make_chart(mirna_target_genes,con,
+                    disease_mirna = None,
+                    mirna = True,
+                    statistics = statistics,
+                    p_value = float(p_value),
+                    mirna_name = mirna,
+                    tab = tab)
+        except KeyError:
+            tab.warning("No enough targets found, to draw the plot")
+            return None
     else:
         #else the number of targets is to loo
         tab.warning("Try different settings or a different miRNA, the number of miRNA targets is to low")
